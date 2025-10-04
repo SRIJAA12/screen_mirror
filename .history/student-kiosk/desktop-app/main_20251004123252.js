@@ -4,6 +4,9 @@ const os = require('os');
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
+// Load configuration from config.js
+const config = require('./config.js');
+
 // Enable screen capturing
 app.commandLine.appendSwitch('enable-usermedia-screen-capturing');
 app.commandLine.appendSwitch('auto-select-desktop-capture-source', 'Entire screen');
@@ -15,8 +18,14 @@ let mainWindow = null;
 let currentSession = null;
 let sessionActive = false;
 
-const SERVER_URL = process.env.SERVER_URL || "http://localhost:8000";
-const LAB_ID = process.env.LAB_ID || "LAB-01";
+// Use configuration values
+const SERVER_URL = config.SERVER_URL;
+const LAB_ID = config.LAB_ID;
+
+console.log('🚀 Kiosk Starting...');
+console.log('📡 Server URL:', SERVER_URL);
+console.log('🏫 Lab ID:', LAB_ID);
+console.log('💻 Admin Server IP:', config.ADMIN_SERVER_IP);
 
 function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
@@ -25,7 +34,7 @@ function createWindow() {
     width,
     height,
     frame: true,
-    fullscreen: false,
+    fullscreen: config.FULL_SCREEN,
     alwaysOnTop: false,
     skipTaskbar: false,
     webPreferences: {
@@ -33,7 +42,8 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       enableBlinkFeatures: 'GetDisplayMedia',
-      webSecurity: false
+      webSecurity: false,
+      devTools: config.SHOW_DEV_TOOLS
     }
   });
 
@@ -53,21 +63,26 @@ function createWindow() {
 
   mainWindow.loadFile('student-interface.html');
 
-  // Open DevTools in detached mode for debugging
-  mainWindow.webContents.openDevTools({ mode: 'detach' });
+  // Open DevTools only if enabled in config
+  if (config.SHOW_DEV_TOOLS) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  }
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     mainWindow.focus();
     
-    globalShortcut.registerAll([
-      'Alt+F4', 'Ctrl+W', 'Ctrl+Alt+Delete', 'Ctrl+Shift+Escape', 
-      'Alt+Tab', 'Escape', 'F11', 'Ctrl+R', 'F5', 'Ctrl+Shift+I', 
-      'F12', 'Ctrl+U'
-    ], () => {
-      console.log('🚫 Keyboard shortcut blocked');
-      return false;
-    });
+    // Register keyboard shortcuts only if enabled in config
+    if (config.ENABLE_KEYBOARD_SHORTCUTS === false) {
+      globalShortcut.registerAll([
+        'Alt+F4', 'Ctrl+W', 'Ctrl+Alt+Delete', 'Ctrl+Shift+Escape', 
+        'Alt+Tab', 'Escape', 'F11', 'Ctrl+R', 'F5', 'Ctrl+Shift+I', 
+        'F12', 'Ctrl+U'
+      ], () => {
+        console.log('🚫 Keyboard shortcut blocked');
+        return false;
+      });
+    }
   });
 
   mainWindow.on('close', (e) => {
@@ -108,6 +123,7 @@ ipcMain.handle('student-login', async (event, credentials) => {
     };
 
     console.log('🔐 Attempting authentication for:', creds.studentId);
+    console.log('📡 Connecting to Admin System:', SERVER_URL);
 
     const authRes = await fetch(`${SERVER_URL}/api/student-authenticate`, {
       method: 'POST',
@@ -123,6 +139,8 @@ ipcMain.handle('student-login', async (event, credentials) => {
 
     console.log('✅ Authentication successful for:', authData.student.name);
 
+    // Create session
+    console.log('📝 Creating session on Admin System...');
     const sessionRes = await fetch(`${SERVER_URL}/api/student-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -131,7 +149,7 @@ ipcMain.handle('student-login', async (event, credentials) => {
         studentId: authData.student.studentId,
         computerName: os.hostname(),
         labId: LAB_ID,
-        systemNumber: credentials.systemNumber || "default"
+        systemNumber: credentials.systemNumber || os.hostname()
       }),
     });
     const sessionData = await sessionRes.json();
@@ -142,23 +160,26 @@ ipcMain.handle('student-login', async (event, credentials) => {
     }
 
     console.log('✅ Session created:', sessionData.sessionId);
+    console.log('🎥 Starting screen streaming to Admin System...');
 
     currentSession = { id: sessionData.sessionId, student: authData.student };
     sessionActive = true;
 
-    // Notify renderer to start screen streaming with delay
+    // Notify renderer to start screen streaming
     setTimeout(() => {
-      console.log('🎬 Sending session-created event to renderer:', sessionData.sessionId);
+      console.log('🎬 Sending session-created event to renderer');
       mainWindow.webContents.send('session-created', {
         sessionId: sessionData.sessionId,
         serverUrl: SERVER_URL
       });
     }, 1000);
 
-    // Don't minimize during testing - comment out for production
-    // setTimeout(() => {
-    //   mainWindow.minimize();
-    // }, 1500);
+    // Minimize in production mode
+    if (config.FULL_SCREEN) {
+      setTimeout(() => {
+        mainWindow.minimize();
+      }, 1500);
+    }
 
     return { 
       success: true, 
@@ -167,7 +188,11 @@ ipcMain.handle('student-login', async (event, credentials) => {
     };
   } catch (error) {
     console.error('❌ Login error:', error);
-    return { success: false, error: error.message || 'Unknown error' };
+    console.error('🔍 Check if Admin System is accessible at:', SERVER_URL);
+    return { 
+      success: false, 
+      error: `Cannot connect to Admin System at ${config.ADMIN_SERVER_IP}. ${error.message}` 
+    };
   }
 });
 
@@ -210,7 +235,9 @@ ipcMain.handle('get-system-info', async () => {
     platform: os.platform(),
     arch: os.arch(),
     cpus: os.cpus(),
-    memory: os.totalmem()
+    memory: os.totalmem(),
+    adminServer: config.ADMIN_SERVER_IP,
+    labId: config.LAB_ID
   };
 });
 
@@ -219,7 +246,25 @@ ipcMain.handle('get-server-url', async () => {
   return SERVER_URL;
 });
 
-app.whenReady().then(createWindow);
+// Get configuration
+ipcMain.handle('get-config', async () => {
+  return {
+    SERVER_URL: config.SERVER_URL,
+    ADMIN_SERVER_IP: config.ADMIN_SERVER_IP,
+    LAB_ID: config.LAB_ID
+  };
+});
+
+app.whenReady().then(() => {
+  console.log('✅ Electron app ready');
+  console.log('📋 Configuration:');
+  console.log('   - Admin Server:', config.ADMIN_SERVER_IP);
+  console.log('   - Server URL:', SERVER_URL);
+  console.log('   - Lab ID:', LAB_ID);
+  console.log('   - Full Screen:', config.FULL_SCREEN);
+  console.log('   - DevTools:', config.SHOW_DEV_TOOLS);
+  createWindow();
+});
 
 app.on('window-all-closed', (e) => {
   e.preventDefault();
@@ -237,12 +282,14 @@ app.on('will-quit', () => {
 
 function gracefulLogout() {
   if (sessionActive && currentSession) {
+    console.log('🔄 Performing graceful logout...');
     const payload = { sessionId: currentSession.id };
     fetch(`${SERVER_URL}/api/student-logout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     }).finally(() => {
+      console.log('👋 App closing');
       app.quit();
     });
   } else {
@@ -251,12 +298,12 @@ function gracefulLogout() {
 }
 
 process.on('SIGINT', (signal) => {
-  console.log('SIGINT received, logging out and quitting...');
+  console.log('⚠️ SIGINT received, logging out and quitting...');
   gracefulLogout();
 });
 
 process.on('SIGTERM', (signal) => {
-  console.log('SIGTERM received, logging out and quitting...');
+  console.log('⚠️ SIGTERM received, logging out and quitting...');
   gracefulLogout();
 });
 

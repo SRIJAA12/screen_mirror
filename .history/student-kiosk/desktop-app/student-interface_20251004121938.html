@@ -1,3 +1,7 @@
+if (!window.electronAPI) {
+  alert("This file must be opened using Electron, NOT in the browser!");
+}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -256,20 +260,23 @@
         </div>
     </div>
 
-    <!-- CRITICAL: Load scripts in correct order at the END -->
+    <!-- Critical scripts: jquery/bootstrap/socketio/renderer -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="renderer.js"></script>
+    <script>
+  console.log("Should see 'pong':", window.testElectronAPI ? window.testElectronAPI.ping() : "not injected");
+</script>
 
     <script>
-        // Demo login data
+        // Demo login data for quick fill buttons
         const demoUsers = [
             { studentId: 'DEMO001', password: 'demo123', name: 'Rajesh Kumar' },
             { studentId: 'DEMO002', password: 'demo123', name: 'Priya Sharma' },
             { studentId: 'DEMO003', password: 'demo123', name: 'Arjun Patel' }
         ];
 
-        // Fill demo login
+        // Quick demo fill function
         function fillDemo(num) {
             const user = demoUsers[num - 1];
             document.getElementById('studentId').value = user.studentId;
@@ -278,10 +285,12 @@
             addDebugLog(`Demo ${num} credentials filled: ${user.name}`);
         }
 
+        // Session tracking variables
         let sessionStartTime = null;
         let durationInterval = null;
         let currentSessionId = null;
 
+        // Update system clock display every second
         function updateTime() {
             const now = new Date();
             document.getElementById('currentTime').textContent = now.toLocaleTimeString();
@@ -289,6 +298,7 @@
         setInterval(updateTime, 1000);
         updateTime();
 
+        // Append messages to debug console
         function addDebugLog(message) {
             const debugLog = document.getElementById('debugLog');
             const timestamp = new Date().toLocaleTimeString();
@@ -297,6 +307,7 @@
             console.log(`[DEBUG] ${message}`);
         }
 
+        // Load system hostname from Electron preload
         async function loadSystemInfo() {
             try {
                 const sysInfo = await window.electronAPI.getSystemInfo();
@@ -309,6 +320,7 @@
         }
         loadSystemInfo();
 
+        // Handle login form submission
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -329,18 +341,22 @@
 
                 if (result.success) {
                     addDebugLog(`✅ Login successful! Session: ${result.sessionId}`);
+
                     currentSessionId = result.sessionId;
 
+                    // Update session modal info
                     document.getElementById('sessionStudentName').textContent = result.student.name;
                     document.getElementById('sessionStudentId').textContent = result.student.studentId;
                     document.getElementById('sessionSystem').textContent = credentials.systemNumber;
                     document.getElementById('sessionLoginTime').textContent = new Date().toLocaleTimeString();
 
+                    // Switch UI from login screen to session active modal
                     document.getElementById('loginScreen').style.display = 'none';
                     document.getElementById('sessionModal').style.display = 'flex';
 
                     sessionStartTime = Date.now();
                     startDurationCounter();
+
                 } else {
                     errorMessage.textContent = result.error || 'Login failed';
                     errorAlert.classList.remove('d-none');
@@ -354,6 +370,7 @@
             }
         });
 
+        // Session duration counter updates every second
         function startDurationCounter() {
             durationInterval = setInterval(() => {
                 const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
@@ -364,6 +381,7 @@
             }, 1000);
         }
 
+        // Logout button handler
         document.getElementById('logoutBtn').addEventListener('click', async () => {
             addDebugLog('Logout initiated...');
 
@@ -378,6 +396,7 @@
                         durationInterval = null;
                     }
 
+                    // Reset UI to login screen
                     document.getElementById('loginForm').reset();
                     document.getElementById('sessionModal').style.display = 'none';
                     document.getElementById('loginScreen').style.display = 'flex';
@@ -395,6 +414,7 @@
             }
         });
 
+        // Display connection status badge
         function updateConnectionStatus(connected) {
             const statusEl = document.getElementById('connectionStatus');
             if (connected) {
@@ -408,6 +428,7 @@
         }
 
         updateConnectionStatus(false);
+        
     </script>
 </body>
 </html>

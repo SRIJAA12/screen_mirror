@@ -189,7 +189,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        const SERVER_URL = window.location.origin;
+        const SERVER_URL = 'http://192.168.0.100:8000';
         const socket = io(SERVER_URL);
 
         let sessions = [];
@@ -219,12 +219,12 @@
             updateConnectionStatus(false);
         });
 
-        socket.on('student-login', (data) => {
+        socket.on('student-login', data => {
             console.log('🟢 ADMIN: New student login:', data);
             loadSessions();
         });
 
-        socket.on('student-logout', (data) => {
+        socket.on('student-logout', data => {
             console.log('🔴 ADMIN: Student logout:', data);
             loadSessions();
         });
@@ -233,34 +233,26 @@
             try {
                 const response = await fetch(`${SERVER_URL}/api/active-sessions/all`);
                 const data = await response.json();
-
                 if (data.success) {
                     sessions = data.sessions;
                     renderSessions();
                     updateStatistics();
                 }
             } catch (error) {
-                console.error('❌ ADMIN: Error loading sessions:', error);
+                console.error('Error loading sessions:', error);
                 document.getElementById('sessionsContainer').innerHTML = `
                     <div class="alert alert-danger">
                         <i class="fas fa-exclamation-triangle"></i> Error loading sessions: ${error.message}
-                    </div>
-                `;
+                    </div>`;
             }
         }
 
         function renderSessions() {
             const container = document.getElementById('sessionsContainer');
-
             if (sessions.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center text-white py-5">
-                        <i class="fas fa-inbox fa-3x mb-3"></i>
-                        <p>No active sessions</p>
-                    </div>`;
+                container.innerHTML = `<div class="text-center text-white py-5"><i class="fas fa-inbox fa-3x mb-3"></i><p>No active sessions</p></div>`;
                 return;
             }
-
             container.innerHTML = sessions.map(session => `
                 <div class="session-card">
                     <div class="row align-items-center">
@@ -294,30 +286,22 @@
 
         function updateStatistics() {
             document.getElementById('activeCount').textContent = sessions.length;
-            document.getElementById('todayCount').textContent = sessions.length;
+            document.getElementById('todayCount').textContent = sessions.length; // You can adjust for today's count if needed
         }
 
         async function startWatching(sessionId, studentName) {
-            // CRITICAL: Close existing connection first
             if (peerConnection) {
-                console.log('🛑 ADMIN: Closing existing peer connection');
                 peerConnection.close();
                 peerConnection = null;
             }
-
-            // CRITICAL: Close existing modal if open
             if (currentModal) {
                 currentModal.hide();
                 currentModal = null;
             }
-
-            console.log('👁️ ADMIN: Starting watch for session:', sessionId);
             currentStreamSession = sessionId;
 
-            // Reset video element completely
             const video = document.getElementById('modalVideo');
             const placeholder = document.getElementById('modalVideoPlaceholder');
-            
             if (video.srcObject) {
                 video.srcObject.getTracks().forEach(track => track.stop());
                 video.srcObject = null;
@@ -327,12 +311,13 @@
 
             document.getElementById('modalStudentName').textContent = studentName;
             document.getElementById('modalSessionInfo').textContent = `Session ID: ${sessionId}`;
-            
-            // Create fresh modal instance
+
             currentModal = new bootstrap.Modal(document.getElementById('videoModal'));
             currentModal.show();
 
-            // Wait for modal animation to complete
+            // Notify server you are joining for this session signaling
+            socket.emit('register-admin', { sessionId });
+
             setTimeout(() => {
                 setupWebRTC(sessionId);
             }, 500);
@@ -340,8 +325,6 @@
 
         async function setupWebRTC(sessionId) {
             try {
-                console.log('📹 ADMIN: Setting up WebRTC for session:', sessionId);
-
                 peerConnection = new RTCPeerConnection({
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
@@ -350,87 +333,56 @@
                 });
 
                 peerConnection.ontrack = (event) => {
-                    console.log('✅ ADMIN: Received remote stream!');
                     const video = document.getElementById('modalVideo');
                     const placeholder = document.getElementById('modalVideoPlaceholder');
-
                     video.srcObject = event.streams[0];
                     video.style.display = 'block';
                     placeholder.style.display = 'none';
-                    
-                    console.log('✅ ADMIN: Video element updated with stream');
+                    console.log('✅ Video stream playing');
                 };
 
                 peerConnection.onicecandidate = (event) => {
                     if (event.candidate) {
-                        console.log('🧊 ADMIN: ICE CANDIDATE:', event.candidate.type);
-                        socket.emit('webrtc-ice-candidate', {
-                            candidate: event.candidate,
-                            sessionId: sessionId
-                        });
-                    } else {
-                        console.log('🧊 ADMIN: All ICE candidates sent');
+                        socket.emit('webrtc-ice-candidate', { candidate: event.candidate, sessionId });
                     }
                 };
 
                 peerConnection.onconnectionstatechange = () => {
-                    console.log('🔗 ADMIN: Connection state:', peerConnection.connectionState);
-                    if (peerConnection.connectionState === 'connected') {
-                        console.log('✅✅✅ ADMIN: CONNECTED! VIDEO IS PLAYING!');
-                    } else if (peerConnection.connectionState === 'failed') {
-                        console.error('❌ ADMIN: Connection failed');
-                    }
+                    console.log('Connection state:', peerConnection.connectionState);
                 };
 
-                peerConnection.oniceconnectionstatechange = () => {
-                    console.log('🧊 ADMIN: ICE state:', peerConnection.iceConnectionState);
-                };
-
-                console.log('📝 ADMIN: Creating offer');
+                console.log('Creating offer');
                 const offer = await peerConnection.createOffer({
                     offerToReceiveVideo: true,
                     offerToReceiveAudio: false
                 });
-                
-                console.log('📝 ADMIN: Setting local description');
                 await peerConnection.setLocalDescription(offer);
-                
-                console.log('📤 ADMIN: Sending offer to kiosk');
-                socket.emit('admin-offer', {
-                    offer,
-                    sessionId,
-                    adminSocketId: socket.id,
-                });
-                
-                console.log('✅ ADMIN: Offer sent, waiting for answer');
+                socket.emit('admin-offer', { offer, sessionId, adminSocketId: socket.id });
             } catch (e) {
-                console.error('❌ ADMIN: WebRTC setup error:', e);
-                alert('Failed to start screen sharing: ' + e.message);
+                alert('Failed to start watching: ' + e.message);
+                console.error(e);
             }
         }
 
         socket.on('webrtc-answer', async ({ answer, sessionId }) => {
-            console.log('✅ ADMIN: Received answer from kiosk for session:', sessionId);
             if (peerConnection && currentStreamSession === sessionId) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-                console.log('✅ ADMIN: Remote description set, ICE should complete now');
+                console.log('Remote description set');
             }
         });
 
         socket.on('webrtc-ice-candidate', async ({ candidate }) => {
             if (peerConnection) {
                 try {
-                    console.log('🧊 ADMIN: Received ICE from kiosk, adding...');
                     await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-                    console.log('✅ ADMIN: ICE candidate added');
                 } catch (e) {
-                    console.error('❌ ADMIN: Error adding ICE:', e);
+                    console.error(e);
                 }
             }
         });
 
+        // Cleanup on modal close
         document.getElementById('videoModal').addEventListener('hidden.bs.modal', () => {
-            console.log('🛑 ADMIN: Modal closing, cleaning up');
             if (peerConnection) {
                 peerConnection.close();
                 peerConnection = null;
@@ -446,14 +398,15 @@
             currentModal = null;
         });
 
+        // Current time update
         function updateTime() {
             document.getElementById('currentTime').textContent = new Date().toLocaleTimeString();
         }
         setInterval(updateTime, 1000);
         updateTime();
 
+        // Regularly refresh the session list
         setInterval(loadSessions, 5000);
-        updateConnectionStatus(false);
     </script>
 </body>
 </html>

@@ -4,7 +4,7 @@ const os = require('os');
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
-// Enable screen capturing
+// Enable screen capturing switches
 app.commandLine.appendSwitch('enable-usermedia-screen-capturing');
 app.commandLine.appendSwitch('auto-select-desktop-capture-source', 'Entire screen');
 app.commandLine.appendSwitch('enable-features', 'MediaStream,GetDisplayMedia');
@@ -15,8 +15,12 @@ let mainWindow = null;
 let currentSession = null;
 let sessionActive = false;
 
-const SERVER_URL = process.env.SERVER_URL || "http://localhost:8000";
-const LAB_ID = process.env.LAB_ID || "LAB-01";
+// Use laptop IP for backend URL so phone can connect via LAN
+const SERVER_IP = '192.168.0.100';
+const SERVER_PORT = 8000;
+const SERVER_URL = `http://${SERVER_IP}:${SERVER_PORT}`;
+
+const LAB_ID = process.env.LAB_ID || 'LAB-01';
 
 function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
@@ -53,17 +57,16 @@ function createWindow() {
 
   mainWindow.loadFile('student-interface.html');
 
-  // Open DevTools in detached mode for debugging
   mainWindow.webContents.openDevTools({ mode: 'detach' });
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     mainWindow.focus();
-    
+
     globalShortcut.registerAll([
-      'Alt+F4', 'Ctrl+W', 'Ctrl+Alt+Delete', 'Ctrl+Shift+Escape', 
-      'Alt+Tab', 'Escape', 'F11', 'Ctrl+R', 'F5', 'Ctrl+Shift+I', 
-      'F12', 'Ctrl+U'
+      'Alt+F4', 'Ctrl+W', 'Ctrl+Alt+Delete', 'Ctrl+Shift+Escape',
+      'Alt+Tab', 'Escape', 'F11', 'Ctrl+R', 'F5',
+      'Ctrl+Shift+I', 'F12', 'Ctrl+U'
     ], () => {
       console.log('🚫 Keyboard shortcut blocked');
       return false;
@@ -83,10 +86,9 @@ function createWindow() {
   });
 }
 
-// Handle screen sources request
 ipcMain.handle('get-screen-sources', async () => {
   try {
-    const sources = await desktopCapturer.getSources({ 
+    const sources = await desktopCapturer.getSources({
       types: ['screen', 'window'],
       thumbnailSize: { width: 1920, height: 1080 }
     });
@@ -98,7 +100,6 @@ ipcMain.handle('get-screen-sources', async () => {
   }
 });
 
-// Handle student login
 ipcMain.handle('student-login', async (event, credentials) => {
   try {
     const creds = {
@@ -131,7 +132,7 @@ ipcMain.handle('student-login', async (event, credentials) => {
         studentId: authData.student.studentId,
         computerName: os.hostname(),
         labId: LAB_ID,
-        systemNumber: credentials.systemNumber || "default"
+        systemNumber: credentials.systemNumber || 'default'
       }),
     });
     const sessionData = await sessionRes.json();
@@ -146,7 +147,6 @@ ipcMain.handle('student-login', async (event, credentials) => {
     currentSession = { id: sessionData.sessionId, student: authData.student };
     sessionActive = true;
 
-    // Notify renderer to start screen streaming with delay
     setTimeout(() => {
       console.log('🎬 Sending session-created event to renderer:', sessionData.sessionId);
       mainWindow.webContents.send('session-created', {
@@ -155,15 +155,10 @@ ipcMain.handle('student-login', async (event, credentials) => {
       });
     }, 1000);
 
-    // Don't minimize during testing - comment out for production
-    // setTimeout(() => {
-    //   mainWindow.minimize();
-    // }, 1500);
-
-    return { 
-      success: true, 
-      student: authData.student, 
-      sessionId: sessionData.sessionId 
+    return {
+      success: true,
+      student: authData.student,
+      sessionId: sessionData.sessionId
     };
   } catch (error) {
     console.error('❌ Login error:', error);
@@ -171,7 +166,6 @@ ipcMain.handle('student-login', async (event, credentials) => {
   }
 });
 
-// Handle student logout
 ipcMain.handle('student-logout', async () => {
   if (!sessionActive || !currentSession) {
     return { success: false, error: 'No active session' };
@@ -203,37 +197,25 @@ ipcMain.handle('student-logout', async () => {
   }
 });
 
-// Get system information
-ipcMain.handle('get-system-info', async () => {
-  return {
-    hostname: os.hostname(),
-    platform: os.platform(),
-    arch: os.arch(),
-    cpus: os.cpus(),
-    memory: os.totalmem()
-  };
-});
+ipcMain.handle('get-system-info', async () => ({
+  hostname: os.hostname(),
+  platform: os.platform(),
+  arch: os.arch(),
+  cpus: os.cpus(),
+  memory: os.totalmem(),
+}));
 
-// Get server URL
-ipcMain.handle('get-server-url', async () => {
-  return SERVER_URL;
-});
+ipcMain.handle('get-server-url', async () => SERVER_URL);
 
 app.whenReady().then(createWindow);
 
-app.on('window-all-closed', (e) => {
-  e.preventDefault();
-});
+app.on('window-all-closed', (e) => e.preventDefault());
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
-app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
-});
+app.on('will-quit', () => globalShortcut.unregisterAll());
 
 function gracefulLogout() {
   if (sessionActive && currentSession) {
@@ -242,25 +224,23 @@ function gracefulLogout() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
-    }).finally(() => {
-      app.quit();
-    });
+    }).finally(() => app.quit());
   } else {
     app.quit();
   }
 }
 
-process.on('SIGINT', (signal) => {
+process.on('SIGINT', () => {
   console.log('SIGINT received, logging out and quitting...');
   gracefulLogout();
 });
 
-process.on('SIGTERM', (signal) => {
+process.on('SIGTERM', () => {
   console.log('SIGTERM received, logging out and quitting...');
   gracefulLogout();
 });
 
-app.on('before-quit', (e) => {
+app.on('before-quit', e => {
   if (sessionActive) {
     e.preventDefault();
     gracefulLogout();

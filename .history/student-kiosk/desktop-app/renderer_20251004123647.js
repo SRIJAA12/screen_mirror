@@ -7,7 +7,7 @@ let serverUrl = null;
 console.log('🎬 Renderer.js loading...');
 
 // Create socket connection immediately
-socket = io("http://192.168.0.100:8000");
+socket = io("http://192.168.29.212:8000");
 
 
 
