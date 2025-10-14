@@ -14,10 +14,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // This is the key fix - desktopCapturer is called in main process, not preload
   getScreenSources: () => ipcRenderer.invoke('get-screen-sources'),
 
-  // Forgot password related placeholders (implement if needed)
+  // Forgot password API methods
   forgotPassword: (data) => ipcRenderer.invoke('forgot-password', data),
-  verifyDob: (data) => ipcRenderer.invoke('verify-dob', data),
+  verifyOTP: (data) => ipcRenderer.invoke('verify-otp', data),
   resetPassword: (data) => ipcRenderer.invoke('reset-password', data),
+  
+  // First-time signin API
+  firstTimeSignin: (data) => ipcRenderer.invoke('first-time-signin', data),
+  checkStudentEligibility: (data) => ipcRenderer.invoke('check-student-eligibility', data),
 
   // Listen for session created event and stop live stream command
   onSessionCreated: (callback) => ipcRenderer.on('session-created', (event, data) => callback(data)),

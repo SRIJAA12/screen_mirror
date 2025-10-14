@@ -89,6 +89,18 @@
             transform: translateY(-2px);
             box-shadow: 0 15px 30px rgba(40, 167, 69, 0.4);
         }
+        .btn-forgot {
+            background: linear-gradient(135deg, #ffc107, #fd7e14);
+            border: none;
+            color: #000;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-forgot:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(255, 193, 7, 0.4);
+            color: #000;
+        }
         .session-modal {
             position: fixed;
             top: 0;
@@ -131,6 +143,13 @@
             max-height: 150px;
             overflow-y: auto;
         }
+        .forgot-password-section {
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.1), rgba(253, 126, 20, 0.1));
+            border: 2px solid #ffc107;
+            border-radius: 15px;
+            padding: 15px;
+            margin-top: 15px;
+        }
     </style>
 </head>
 <body>
@@ -151,30 +170,38 @@
                 <div class="system-info">
                     <h5 class="text-danger mb-3"><i class="fas fa-info-circle"></i> System Information</h5>
                     <div class="row">
-                        <div class="col-md-6 mb-2">
+                        <div class="col-md-4 mb-2">
                             <strong>Computer Name:</strong> <span id="computerName">Loading...</span>
                         </div>
-                        <div class="col-md-6 mb-2">
-                            <strong>Lab ID:</strong> <span class="badge bg-danger">LAB-01</span>
+                        <div class="col-md-4 mb-2">
+                            <strong>Lab ID:</strong> <span class="badge bg-danger">CC1</span>
                         </div>
-                        <div class="col-md-12 mb-2">
+                        <div class="col-md-4 mb-2">
+                            <strong>System Number:</strong> <span id="systemNumberDisplay" class="badge bg-info">Loading...</span>
+                        </div>
+                        <div class="col-md-6 mb-2">
                             <strong>Current Time:</strong> <span id="currentTime" style="color: #28a745; font-weight: bold;">--:--:--</span>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <strong>Kiosk Mode:</strong> <span class="badge bg-warning">🔒 ACTIVE</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="demo-section">
-                    <h5 class="text-success mb-3"><i class="fas fa-rocket"></i> Quick Demo Logins</h5>
-                    <p class="text-muted small mb-3">Click any button below to auto-fill login credentials for demo</p>
+                    <h5 class="text-success mb-3"><i class="fas fa-info-circle"></i> Getting Started</h5>
+                    <p class="text-muted small mb-3">
+                        <strong>New to the system?</strong> Contact your admin to get sample data setup and receive your one-time password.
+                    </p>
                     <div class="d-flex justify-content-center flex-wrap">
-                        <button class="btn demo-btn" onclick="fillDemo(1)">
-                            <i class="fas fa-user"></i> Demo Student 1
+                        <button class="btn demo-btn" onclick="showSystemInfo()">
+                            <i class="fas fa-info"></i> System Info
                         </button>
-                        <button class="btn demo-btn" onclick="fillDemo(2)">
-                            <i class="fas fa-user"></i> Demo Student 2
+                        <button class="btn demo-btn" onclick="testConnection()">
+                            <i class="fas fa-wifi"></i> Test Connection
                         </button>
-                        <button class="btn demo-btn" onclick="fillDemo(3)">
-                            <i class="fas fa-user"></i> Demo Student 3
+                        <button class="btn demo-btn" onclick="showHelp()">
+                            <i class="fas fa-question-circle"></i> Help
                         </button>
                     </div>
                 </div>
@@ -196,17 +223,53 @@
                         <label class="form-label fw-bold"><i class="fas fa-desktop"></i> System Number</label>
                         <select class="form-select form-select-lg" id="systemNumber" required>
                             <option value="">Select System Number</option>
-                            <option value="PC-01">PC-01</option>
-                            <option value="PC-02">PC-02</option>
-                            <option value="PC-03">PC-03</option>
-                            <option value="PC-04">PC-04</option>
-                            <option value="PC-05">PC-05</option>
+                            <option value="CC1-01">CC1-01</option>
+                            <option value="CC1-02">CC1-02</option>
+                            <option value="CC1-03">CC1-03</option>
+                            <option value="CC1-04">CC1-04</option>
+                            <option value="CC1-05">CC1-05</option>
+                            <option value="CC1-06">CC1-06</option>
+                            <option value="CC1-07">CC1-07</option>
+                            <option value="CC1-08">CC1-08</option>
+                            <option value="CC1-09">CC1-09</option>
+                            <option value="CC1-10">CC1-10</option>
+                            <option value="CC2-01">CC2-01</option>
+                            <option value="CC2-02">CC2-02</option>
+                            <option value="CC2-03">CC2-03</option>
+                            <option value="CC2-04">CC2-04</option>
+                            <option value="CC2-05">CC2-05</option>
+                            <option value="CC2-06">CC2-06</option>
+                            <option value="CC2-07">CC2-07</option>
+                            <option value="CC2-08">CC2-08</option>
+                            <option value="CC2-09">CC2-09</option>
+                            <option value="CC2-10">CC2-10</option>
                         </select>
                     </div>
                     <button type="submit" class="btn btn-unlock btn-lg">
                         <i class="fas fa-unlock"></i> Unlock & Start Session
                     </button>
+                    
+                    <!-- NEW: Forgot Password Button -->
+                    <button type="button" class="btn btn-forgot btn-lg mt-3 w-100" onclick="showForgotPassword()">
+                        <i class="fas fa-key"></i> Forgot Password?
+                    </button>
+                    
+                    <!-- NEW: First-time Sign-in Button -->
+                    <button type="button" class="btn btn-warning btn-lg mt-2 w-100" onclick="goToFirstTimeSignin()">
+                        <i class="fas fa-user-plus"></i> First-time Sign-in
+                    </button>
                 </form>
+
+                <!-- NEW: Help Section -->
+                <div class="forgot-password-section">
+                    <h6 class="text-warning mb-2"><i class="fas fa-lightbulb"></i> Need Help?</h6>
+                    <p class="text-muted small mb-2">
+                        <strong>First-time Sign-in:</strong> If you're logging in for the first time, click "First-time Sign-in" to set up your password.
+                    </p>
+                    <p class="text-muted small mb-0">
+                        <strong>Forgot Password:</strong> If you forgot your password, click "Forgot Password?" and follow the email verification process.
+                    </p>
+                </div>
 
                 <div class="debug-section mt-4">
                     <h6 class="text-muted mb-2"><i class="fas fa-bug"></i> Debug Console</h6>
@@ -262,20 +325,83 @@
     <script src="renderer.js"></script>
 
     <script>
-        // Demo login data
-        const demoUsers = [
-            { studentId: 'DEMO001', password: 'demo123', name: 'Rajesh Kumar' },
-            { studentId: 'DEMO002', password: 'demo123', name: 'Priya Sharma' },
-            { studentId: 'DEMO003', password: 'demo123', name: 'Arjun Patel' }
-        ];
+        // NEW: Helper Functions
+        function showSystemInfo() {
+            const computerName = document.getElementById('computerName').textContent;
+            const systemNumber = document.getElementById('systemNumberDisplay').textContent;
+            
+            alert(`🖥️ System Information:
 
-        // Fill demo login
-        function fillDemo(num) {
-            const user = demoUsers[num - 1];
-            document.getElementById('studentId').value = user.studentId;
-            document.getElementById('password').value = user.password;
-            document.getElementById('systemNumber').value = 'PC-0' + num;
-            addDebugLog(`Demo ${num} credentials filled: ${user.name}`);
+Computer Name: ${computerName}
+System Number: ${systemNumber}
+Lab ID: CC1
+Current Time: ${new Date().toLocaleString()}
+
+Status: Kiosk Mode Active
+Server: Connected to Lab Management System`);
+            
+            addDebugLog('System information displayed');
+        }
+
+        function testConnection() {
+            addDebugLog('Testing connection to server...');
+            
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`✅ Connection Test Successful!
+
+Server Status: Online
+Total Students: ${data.stats.totalStudents}
+Students with Passwords: ${data.stats.passwordsSet}
+Pending Setup: ${data.stats.pendingPasswords}
+
+Connection: Working properly`);
+                        addDebugLog('✅ Connection test successful');
+                    } else {
+                        alert('⚠️ Server responded but with errors');
+                        addDebugLog('⚠️ Server error in connection test');
+                    }
+                })
+                .catch(error => {
+                    alert(`❌ Connection Test Failed:
+
+Error: ${error.message}
+
+Please check:
+- Server is running
+- Network connection is working
+- Contact admin if problem persists`);
+                    addDebugLog(`❌ Connection test failed: ${error.message}`);
+                });
+        }
+
+        function showHelp() {
+            alert(`🆘 Lab Kiosk Help:
+
+📝 FIRST-TIME USERS:
+1. Get your one-time password from admin
+2. Click "First-time Sign-in"
+3. Enter Student ID and one-time password
+4. Create your permanent password
+
+🔑 EXISTING USERS:
+1. Enter your Student ID and password
+2. Select your system number
+3. Click "Unlock & Start Session"
+
+❓ FORGOT PASSWORD:
+1. Click "Forgot Password?"
+2. Enter Student ID (Roll Number)
+3. Enter your email address
+4. Check email for OTP code
+5. Enter OTP and create new password
+
+📞 NEED HELP?
+Contact your lab administrator for assistance.`);
+            
+            addDebugLog('Help information displayed');
         }
 
         let sessionStartTime = null;
@@ -301,12 +427,55 @@
             try {
                 const sysInfo = await window.electronAPI.getSystemInfo();
                 document.getElementById('computerName').textContent = sysInfo.hostname;
-                addDebugLog(`System loaded: ${sysInfo.hostname}`);
+                
+                // Try to detect system number from hostname or environment
+                const systemNumber = detectSystemNumber(sysInfo.hostname);
+                document.getElementById('systemNumberDisplay').textContent = systemNumber;
+                
+                addDebugLog(`System loaded: ${sysInfo.hostname} (${systemNumber})`);
             } catch (error) {
                 console.error('Error loading system info:', error);
+                document.getElementById('systemNumberDisplay').textContent = 'Unknown';
                 addDebugLog(`Error: ${error.message}`);
             }
         }
+
+        function detectSystemNumber(hostname) {
+            // Try to extract system number from hostname
+            const patterns = [
+                /CC1-?(\d+)/i,          // CC1-01, CC101
+                /CC2-?(\d+)/i,          // CC2-01, CC201
+                /PC-?(\d+)/i,           // PC-01, PC01
+                /LAB-?\d+-?(\d+)/i,     // LAB-01-01, LAB1-1
+                /SYSTEM-?(\d+)/i,       // SYSTEM-01
+                /COMP-?(\d+)/i,         // COMP-01
+                /(\d+)$/                // Ends with number
+            ];
+            
+            for (const pattern of patterns) {
+                const match = hostname.match(pattern);
+                if (match) {
+                    const num = parseInt(match[1]);
+                    // Check if it's CC1 or CC2 pattern
+                    if (hostname.match(/CC1/i)) {
+                        return `CC1-${String(num).padStart(2, '0')}`;
+                    } else if (hostname.match(/CC2/i)) {
+                        return `CC2-${String(num).padStart(2, '0')}`;
+                    } else {
+                        return `CC1-${String(num).padStart(2, '0')}`;
+                    }
+                }
+            }
+            
+            // Fallback: generate based on hostname hash
+            let hash = 0;
+            for (let i = 0; i < hostname.length; i++) {
+                hash = ((hash << 5) - hash + hostname.charCodeAt(i)) & 0xffffffff;
+            }
+            const systemNum = (Math.abs(hash) % 10) + 1;
+            return `CC1-${String(systemNum).padStart(2, '0')}`;
+        }
+
         loadSystemInfo();
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -408,6 +577,224 @@
         }
 
         updateConnectionStatus(false);
+
+        // NEW: Navigation Functions
+        function goToFirstTimeSignin() {
+            addDebugLog('👤 Navigating to first-time sign-in page');
+            window.location.href = 'first-signin.html';
+        }
+
+        // NEW: Enhanced Forgot Password Functions with OTP verification
+        function showForgotPassword() {
+            addDebugLog('🔑 Forgot password initiated');
+            showForgotPasswordStep1();
+        }
+
+        function showForgotPasswordStep1() {
+            const studentId = prompt("🆔 Enter your Student ID (Roll Number):");
+            if (!studentId) {
+                addDebugLog('Forgot password cancelled - no student ID');
+                return;
+            }
+            
+            addDebugLog(`🔍 Verifying student ID: ${studentId}`);
+            initiateForgotPassword(studentId.toUpperCase());
+        }
+
+        async function initiateForgotPassword(studentId) {
+            try {
+                const response = await fetch('/api/forgot-password-initiate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ studentId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addDebugLog(`✅ Student verified: ${data.studentName}`);
+                    
+                    const email = prompt(`📧 Enter your email address:
+
+Student: ${data.studentName}
+Registered Email: ${data.maskedEmail}
+
+Please enter your complete email address:`);
+                    
+                    if (!email) {
+                        addDebugLog('Forgot password cancelled - no email');
+                        return;
+                    }
+                    
+                    // Validate email format
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(email)) {
+                        alert("❌ Invalid email format!\n\nPlease enter a valid email address.");
+                        addDebugLog('Invalid email format provided');
+                        return;
+                    }
+                    
+                    sendOTPToEmail(studentId, email, data.studentName);
+                    
+                } else {
+                    alert(`❌ Student Verification Failed:
+
+${data.error}
+
+Please check:
+- Student ID (Roll Number) is correct
+- You have already set a password previously
+- Contact admin if you need help`);
+                    addDebugLog(`❌ Student verification error: ${data.error}`);
+                }
+                
+            } catch (error) {
+                alert(`❌ Network error occurred:\n\n${error.message}\n\nPlease ensure server is running and try again.`);
+                addDebugLog(`❌ Network error: ${error.message}`);
+            }
+        }
+
+        async function sendOTPToEmail(studentId, email, studentName) {
+            try {
+                addDebugLog(`📧 Sending OTP to email: ${email}`);
+                
+                const response = await fetch('/api/forgot-password-send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ studentId, email })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addDebugLog(`✅ OTP sent to ${email}`);
+                    
+                    alert(`📧 OTP Sent Successfully!
+
+Dear ${studentName},
+
+An OTP (One-Time Password) has been sent to:
+${email}
+
+Please check your email and enter the 6-digit OTP in the next step.
+
+Note: OTP will expire in 10 minutes.`);
+                    
+                    // Now ask for OTP and new password
+                    verifyOTPAndResetPassword(studentId, email, studentName);
+                    
+                } else {
+                    alert(`❌ Failed to Send OTP:
+
+${data.error}
+
+Please check:
+- Email address is correct
+- Email matches your registered email
+- Try again with correct information`);
+                    addDebugLog(`❌ OTP send error: ${data.error}`);
+                }
+                
+            } catch (error) {
+                alert(`❌ Network error occurred:\n\n${error.message}\n\nPlease ensure server is running and try again.`);
+                addDebugLog(`❌ Network error: ${error.message}`);
+            }
+        }
+
+        async function verifyOTPAndResetPassword(studentId, email, studentName) {
+            const otp = prompt(`🔐 Enter the 6-digit OTP:
+
+Student: ${studentName}
+Email: ${email}
+
+Please enter the OTP you received in your email:`);
+            
+            if (!otp) {
+                addDebugLog('Forgot password cancelled - no OTP');
+                return;
+            }
+            
+            // Validate OTP format
+            if (!/^\d{6}$/.test(otp)) {
+                alert("❌ Invalid OTP format!\n\nOTP must be exactly 6 digits.\nExample: 123456");
+                addDebugLog('Invalid OTP format provided');
+                return;
+            }
+            
+            const newPassword = prompt(`🔐 Enter your new password:
+
+Password Requirements:
+- At least 6 characters long
+- Can contain letters, numbers, and symbols
+
+Please enter your new password:`);
+            
+            if (!newPassword) {
+                addDebugLog('Forgot password cancelled - no new password');
+                return;
+            }
+            
+            if (newPassword.length < 6) {
+                alert("❌ Password too short!\n\nPassword must be at least 6 characters long.");
+                addDebugLog('Password too short');
+                return;
+            }
+            
+            // Verify OTP and reset password
+            try {
+                addDebugLog(`🔄 Verifying OTP and resetting password for: ${studentId}`);
+                
+                const response = await fetch('/api/forgot-password-verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        studentId, 
+                        email, 
+                        otp, 
+                        newPassword 
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addDebugLog(`✅ Password reset successful for ${studentId}`);
+                    
+                    alert(`✅ Password Reset Successful!
+
+Dear ${data.student.name},
+
+Your password has been successfully reset!
+
+You can now login with:
+- Student ID: ${data.student.studentId}
+- New Password: [The password you just set]
+
+Click OK to return to login.`);
+                    
+                    // Auto-fill the student ID in login form
+                    document.getElementById('studentId').value = studentId;
+                    document.getElementById('password').focus();
+                    
+                    addDebugLog(`Student ID auto-filled: ${studentId}`);
+                    
+                } else {
+                    alert(`❌ Password Reset Failed:
+
+${data.error}
+
+Please check:
+- OTP is correct and not expired
+- All information is accurate
+- Try the process again if needed`);
+                    addDebugLog(`❌ Password reset error: ${data.error}`);
+                }
+                
+            } catch (error) {
+                alert(`❌ Network error occurred:\n\n${error.message}\n\nPlease ensure server is running and try again.`);
+                addDebugLog(`❌ Network error: ${error.message}`);
+            }
+        }
     </script>
 </body>
 </html>

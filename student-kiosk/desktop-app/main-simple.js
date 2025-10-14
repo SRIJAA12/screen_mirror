@@ -1,11 +1,9 @@
 const { app, BrowserWindow, ipcMain, screen, dialog, globalShortcut, desktopCapturer } = require('electron');
 const path = require('path');
 const os = require('os');
+const fs = require('fs');
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
-
-// Load configuration from config.js
-const config = require('./config.js');
 
 // Enable screen capturing
 app.commandLine.appendSwitch('enable-usermedia-screen-capturing');
@@ -18,14 +16,14 @@ let mainWindow = null;
 let currentSession = null;
 let sessionActive = false;
 
-// Use configuration values
-const SERVER_URL = config.SERVER_URL;
-const LAB_ID = config.LAB_ID;
+// Server URL - updated to current network IP
+const SERVER_URL = 'http://192.168.29.212:8000';
+const LAB_ID = process.env.LAB_ID || "CC1";
+const SYSTEM_NUMBER = process.env.SYSTEM_NUMBER || `CC1-${String(Math.floor(Math.random() * 10) + 1).padStart(2, '0')}`;
 
-console.log('🚀 Kiosk Starting...');
-console.log('📡 Server URL:', SERVER_URL);
-console.log('🏫 Lab ID:', LAB_ID);
-console.log('💻 Admin Server IP:', config.ADMIN_SERVER_IP);
+// Kiosk mode configuration - DISABLED FOR DEBUGGING
+const KIOSK_MODE = false; // Disabled for debugging
+let isKioskLocked = false; // System starts unlocked for debugging
 
 function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
@@ -33,17 +31,20 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width,
     height,
-    frame: true,
-    fullscreen: config.FULL_SCREEN,
-    alwaysOnTop: false,
-    skipTaskbar: false,
+    frame: true,                             // Show frame for debugging
+    fullscreen: false,                       // Windowed mode for debugging
+    alwaysOnTop: false,                      // Allow other windows
+    skipTaskbar: false,                      // Show in taskbar
+    kiosk: false,                            // Disable kiosk mode
+    resizable: true,                         // Allow resizing
+    minimizable: true,                       // Allow minimize
+    closable: true,                          // Allow close
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       enableBlinkFeatures: 'GetDisplayMedia',
-      webSecurity: false,
-      devTools: config.SHOW_DEV_TOOLS
+      webSecurity: false
     }
   });
 
@@ -63,38 +64,41 @@ function createWindow() {
 
   mainWindow.loadFile('student-interface.html');
 
-  // Open DevTools only if enabled in config
-  if (config.SHOW_DEV_TOOLS) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
-  }
+  // Open DevTools in detached mode for debugging
+  mainWindow.webContents.openDevTools({ mode: 'detach' });
+  
+  console.log('🐛 DEBUG MODE: Kiosk restrictions disabled for development');
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     mainWindow.focus();
     
-    // Register keyboard shortcuts only if enabled in config
-    if (config.ENABLE_KEYBOARD_SHORTCUTS === false) {
-      globalShortcut.registerAll([
-        'Alt+F4', 'Ctrl+W', 'Ctrl+Alt+Delete', 'Ctrl+Shift+Escape', 
-        'Alt+Tab', 'Escape', 'F11', 'Ctrl+R', 'F5', 'Ctrl+Shift+I', 
-        'F12', 'Ctrl+U'
-      ], () => {
-        console.log('🚫 Keyboard shortcut blocked');
-        return false;
-      });
-    }
+    console.log(`🐛 DEBUG MODE - System: ${SYSTEM_NUMBER}, Lab: ${LAB_ID} - Server: ${SERVER_URL}`);
   });
 
+  // Allow normal window closure for debugging
   mainWindow.on('close', (e) => {
-    if (!sessionActive) {
-      e.preventDefault();
-      dialog.showMessageBox(mainWindow, {
-        type: 'warning',
-        buttons: ['OK'],
-        title: 'Operation Denied',
-        message: 'You must be logged in to close the application.'
+    if (sessionActive) {
+      // Show logout confirmation
+      const choice = dialog.showMessageBoxSync(mainWindow, {
+        type: 'question',
+        buttons: ['Logout & Close', 'Cancel'],
+        defaultId: 1,
+        title: 'Confirm Logout',
+        message: 'Are you sure you want to logout and close the application?',
+        detail: 'Your session will be ended and all work should be saved.'
       });
+      
+      if (choice === 0) {
+        // Perform logout then close
+        performLogout().then(() => {
+          app.quit();
+        });
+      } else {
+        e.preventDefault();
+      }
     }
+    // Allow close if not logged in (for debugging)
   });
 }
 
@@ -123,7 +127,6 @@ ipcMain.handle('student-login', async (event, credentials) => {
     };
 
     console.log('🔐 Attempting authentication for:', creds.studentId);
-    console.log('📡 Connecting to Admin System:', SERVER_URL);
 
     const authRes = await fetch(`${SERVER_URL}/api/student-authenticate`, {
       method: 'POST',
@@ -139,8 +142,6 @@ ipcMain.handle('student-login', async (event, credentials) => {
 
     console.log('✅ Authentication successful for:', authData.student.name);
 
-    // Create session
-    console.log('📝 Creating session on Admin System...');
     const sessionRes = await fetch(`${SERVER_URL}/api/student-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -149,7 +150,7 @@ ipcMain.handle('student-login', async (event, credentials) => {
         studentId: authData.student.studentId,
         computerName: os.hostname(),
         labId: LAB_ID,
-        systemNumber: credentials.systemNumber || os.hostname()
+        systemNumber: credentials.systemNumber || SYSTEM_NUMBER
       }),
     });
     const sessionData = await sessionRes.json();
@@ -160,26 +161,26 @@ ipcMain.handle('student-login', async (event, credentials) => {
     }
 
     console.log('✅ Session created:', sessionData.sessionId);
-    console.log('🎥 Starting screen streaming to Admin System...');
 
     currentSession = { id: sessionData.sessionId, student: authData.student };
     sessionActive = true;
+    isKioskLocked = false; // Unlock the system
 
-    // Notify renderer to start screen streaming
+    // Update window properties after login (relaxed for debugging)
+    mainWindow.setClosable(true); // Allow close for debugging
+    mainWindow.setMinimizable(true); // Allow minimize
+    mainWindow.setAlwaysOnTop(false); // Allow other windows to come to front
+
+    console.log(`🔓 System unlocked for: ${authData.student.name} (${authData.student.studentId})`);
+
+    // Notify renderer to start screen streaming with delay
     setTimeout(() => {
-      console.log('🎬 Sending session-created event to renderer');
+      console.log('🎬 Sending session-created event to renderer:', sessionData.sessionId);
       mainWindow.webContents.send('session-created', {
         sessionId: sessionData.sessionId,
         serverUrl: SERVER_URL
       });
     }, 1000);
-
-    // Minimize in production mode
-    if (config.FULL_SCREEN) {
-      setTimeout(() => {
-        mainWindow.minimize();
-      }, 1500);
-    }
 
     return { 
       success: true, 
@@ -188,11 +189,7 @@ ipcMain.handle('student-login', async (event, credentials) => {
     };
   } catch (error) {
     console.error('❌ Login error:', error);
-    console.error('🔍 Check if Admin System is accessible at:', SERVER_URL);
-    return { 
-      success: false, 
-      error: `Cannot connect to Admin System at ${config.ADMIN_SERVER_IP}. ${error.message}` 
-    };
+    return { success: false, error: error.message || 'Unknown error' };
   }
 });
 
@@ -217,9 +214,17 @@ ipcMain.handle('student-logout', async () => {
 
     sessionActive = false;
     currentSession = null;
+    isKioskLocked = true; // Lock the system again
 
+    // Restore properties (relaxed for debugging)
+    mainWindow.setClosable(true);
+    mainWindow.setMinimizable(true);
+    mainWindow.setAlwaysOnTop(false);
+    
     mainWindow.restore();
     mainWindow.focus();
+    
+    console.log('🔒 System locked after logout');
 
     return { success: true };
   } catch (error) {
@@ -235,9 +240,7 @@ ipcMain.handle('get-system-info', async () => {
     platform: os.platform(),
     arch: os.arch(),
     cpus: os.cpus(),
-    memory: os.totalmem(),
-    adminServer: config.ADMIN_SERVER_IP,
-    labId: config.LAB_ID
+    memory: os.totalmem()
   };
 });
 
@@ -246,25 +249,49 @@ ipcMain.handle('get-server-url', async () => {
   return SERVER_URL;
 });
 
-// Get configuration
-ipcMain.handle('get-config', async () => {
-  return {
-    SERVER_URL: config.SERVER_URL,
-    ADMIN_SERVER_IP: config.ADMIN_SERVER_IP,
-    LAB_ID: config.LAB_ID
-  };
+// Reset Password with Date of Birth verification
+ipcMain.handle('reset-password', async (event, data) => {
+  try {
+    const response = await fetch(`${SERVER_URL}/api/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });
 
-app.whenReady().then(() => {
-  console.log('✅ Electron app ready');
-  console.log('📋 Configuration:');
-  console.log('   - Admin Server:', config.ADMIN_SERVER_IP);
-  console.log('   - Server URL:', SERVER_URL);
-  console.log('   - Lab ID:', LAB_ID);
-  console.log('   - Full Screen:', config.FULL_SCREEN);
-  console.log('   - DevTools:', config.SHOW_DEV_TOOLS);
-  createWindow();
+// First-time signin
+ipcMain.handle('first-time-signin', async (event, data) => {
+  try {
+    const response = await fetch(`${SERVER_URL}/api/student-first-signin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });
+
+// Check student eligibility for first-time signin
+ipcMain.handle('check-student-eligibility', async (event, data) => {
+  try {
+    const response = await fetch(`${SERVER_URL}/api/check-student-eligibility`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return await response.json();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+app.whenReady().then(createWindow);
 
 app.on('window-all-closed', (e) => {
   e.preventDefault();
@@ -280,16 +307,34 @@ app.on('will-quit', () => {
   globalShortcut.unregisterAll();
 });
 
+// Helper function for logout
+async function performLogout() {
+  if (sessionActive && currentSession) {
+    try {
+      console.log('🚪 Performing logout for session:', currentSession.id);
+      
+      mainWindow.webContents.send('stop-live-stream');
+      
+      await fetch(`${SERVER_URL}/api/student-logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: currentSession.id }),
+      });
+      
+      sessionActive = false;
+      currentSession = null;
+      isKioskLocked = true;
+      
+      console.log('✅ Logout completed');
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+    }
+  }
+}
+
 function gracefulLogout() {
   if (sessionActive && currentSession) {
-    console.log('🔄 Performing graceful logout...');
-    const payload = { sessionId: currentSession.id };
-    fetch(`${SERVER_URL}/api/student-logout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).finally(() => {
-      console.log('👋 App closing');
+    performLogout().finally(() => {
       app.quit();
     });
   } else {
@@ -298,12 +343,12 @@ function gracefulLogout() {
 }
 
 process.on('SIGINT', (signal) => {
-  console.log('⚠️ SIGINT received, logging out and quitting...');
+  console.log('SIGINT received, logging out and quitting...');
   gracefulLogout();
 });
 
 process.on('SIGTERM', (signal) => {
-  console.log('⚠️ SIGTERM received, logging out and quitting...');
+  console.log('SIGTERM received, logging out and quitting...');
   gracefulLogout();
 });
 

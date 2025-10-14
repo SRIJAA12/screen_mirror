@@ -2,14 +2,12 @@
 let socket = null;
 let pc = null;
 let sessionId = null;
-let serverUrl = null;
+let serverUrl = "http://192.168.29.212:8000";
 
 console.log('🎬 Renderer.js loading...');
 
 // Create socket connection immediately
-socket = io("http://192.168.0.100:8000");
-
-
+socket = io(serverUrl);
 
 socket.on('connect', () => {
   console.log('✅ Socket.io connected:', socket.id);
@@ -49,7 +47,7 @@ window.electronAPI.onSessionCreated(async (data) => {
   console.log('📡 Registering kiosk for session:', sessionId);
   socket.emit('register-kiosk', { sessionId });
 
-  // Start capturing and streaming screen
+  // Start capturing and streaming screen - THIS IS THE KEY!
   await startLiveStream();
 });
 
@@ -59,10 +57,13 @@ window.electronAPI.onStopLiveStream(() => {
   stopLiveStream();
 });
 
-// Start live streaming function
+// Global variable to store the screen stream
+let localStream = null;
+
+// Prepare screen capture - get the stream but don't create peer connection yet
 async function startLiveStream() {
   try {
-    console.log('🎥 Starting live stream for session:', sessionId);
+    console.log('🎥 Preparing screen capture for session:', sessionId);
 
     const sources = await window.electronAPI.getScreenSources();
     
@@ -73,7 +74,7 @@ async function startLiveStream() {
     const screenSource = sources.find(source => source.id.startsWith('screen')) || sources[0];
     console.log('📺 Screen source obtained:', screenSource.name, 'ID:', screenSource.id);
 
-    const stream = await navigator.mediaDevices.getUserMedia({
+    localStream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: {
         mandatory: {
@@ -89,81 +90,94 @@ async function startLiveStream() {
     });
 
     console.log('✅ Screen stream obtained successfully');
-    console.log('📊 Stream tracks:', stream.getTracks().map(t => `${t.kind} (${t.label})`));
+    console.log('📊 Stream tracks:', localStream.getTracks().map(t => `${t.kind} (${t.label})`));
+    console.log('✅ Ready for admin connections - waiting for offers...');
 
-    // Create peer connection with TURN server support
-    pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ],
-      iceCandidatePoolSize: 10
-    });
-
-    // Add all tracks from stream
-    stream.getTracks().forEach(track => {
-      pc.addTrack(track, stream);
-      console.log('➕ Added track to PC:', track.kind, track.label);
-    });
-
-    // Set up ALL event handlers BEFORE creating offer
-    pc.onicecandidate = event => {
-      if (event.candidate) {
-        console.log('🧊 KIOSK ICE CANDIDATE:', event.candidate.type, event.candidate.candidate);
-        socket.emit('webrtc-ice-candidate', {
-          candidate: event.candidate,
-          sessionId: sessionId
-        });
-      } else {
-        console.log('🧊 Kiosk: All ICE candidates sent');
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log('🔗 Kiosk connection state:', pc.connectionState);
-      if (pc.connectionState === 'connected') {
-        console.log('✅✅✅ KIOSK CONNECTED! VIDEO FLOWING!');
-      }
-    };
-
-    pc.oniceconnectionstatechange = () => {
-      console.log('🧊 Kiosk ICE state:', pc.iceConnectionState);
-    };
-
-    pc.onicegatheringstatechange = () => {
-      console.log('🧊 Kiosk ICE gathering:', pc.iceGatheringState);
-    };
-
-    console.log('✅ Live stream setup completed - waiting for admin');
+    console.log('✅ Screen capture ready - waiting for admin offers...');
   } catch (error) {
     console.error('❌ Error in startLiveStream:', error);
     alert('Screen sharing failed: ' + error.message);
   }
 }
 
-// Listen for admin offer
+// Listen for admin offer - Create peer connection when offer received
 socket.on('admin-offer', async ({ offer, sessionId: adminSessionId, adminSocketId }) => {
   console.log('📥 KIOSK: Received admin offer for session:', adminSessionId);
+  console.log('📥 KIOSK: Current sessionId:', sessionId);
+  console.log('📥 KIOSK: localStream available:', !!localStream);
   
   if (adminSessionId !== sessionId) {
-    console.warn('⚠️ Session ID mismatch');
+    console.warn('⚠️ Session ID mismatch - admin:', adminSessionId, 'kiosk:', sessionId);
     return;
   }
 
-  if (!pc) {
-    console.error('❌ Peer connection not initialized');
+  if (!localStream) {
+    console.error('❌ Screen stream not ready - cannot create peer connection');
+    console.error('❌ Try refreshing the kiosk or check screen permissions');
     return;
   }
+
+  // Create peer connection NOW when we receive the offer
+  console.log('🔗 Creating peer connection for admin offer...');
+  pc = new RTCPeerConnection({
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' }
+    ],
+    iceCandidatePoolSize: 10
+  });
+  console.log('✅ KIOSK: Peer connection created with enhanced ICE configuration');
+
+  // Add all tracks from stream
+  localStream.getTracks().forEach(track => {
+    pc.addTrack(track, localStream);
+    console.log('➕ Added track to PC:', track.kind, track.label);
+  });
+
+  // Set up event handlers
+  pc.onicecandidate = event => {
+    if (event.candidate) {
+      console.log('🧊 ✅ KIOSK SENDING ICE CANDIDATE:', event.candidate.type, event.candidate.candidate.substring(0, 50) + '...');
+      socket.emit('webrtc-ice-candidate', {
+        candidate: event.candidate,
+        sessionId: sessionId
+      });
+      console.log('🧊 ✅ ICE candidate sent to server');
+    } else {
+      console.log('🧊 ✅ Kiosk: All ICE candidates sent - gathering complete');
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    console.log('🔗 Kiosk connection state:', pc.connectionState);
+    if (pc.connectionState === 'connected') {
+      console.log('✅✅✅ KIOSK CONNECTED! VIDEO FLOWING!');
+    }
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    console.log('🧊 Kiosk ICE state:', pc.iceConnectionState);
+  };
+
+  pc.onicegatheringstatechange = () => {
+    console.log('🧊 Kiosk ICE gathering:', pc.iceGatheringState);
+  };
 
   try {
     console.log('🤝 KIOSK: Setting remote description');
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    console.log('✅ KIOSK: Remote description set successfully');
     
     console.log('📝 KIOSK: Creating answer');
     const answer = await pc.createAnswer();
+    console.log('✅ KIOSK: Answer created successfully');
     
     console.log('📝 KIOSK: Setting local description');
     await pc.setLocalDescription(answer);
+    console.log('✅ KIOSK: Local description set successfully');
     
     console.log('📤 KIOSK: Sending answer to admin');
     socket.emit('webrtc-answer', { 
@@ -171,14 +185,16 @@ socket.on('admin-offer', async ({ offer, sessionId: adminSessionId, adminSocketI
       adminSocketId, 
       sessionId 
     });
+    console.log('✅ KIOSK: Answer sent to admin');
     
-    console.log('✅ KIOSK: Handshake completed, ICE should flow now');
+    console.log('✅✅✅ KIOSK: Handshake completed, video tracks should be flowing now!');
   } catch (e) {
-    console.error('❌ KIOSK: Error handling offer:', e);
+    console.error('❌❌ KIOSK: Error handling offer:', e);
+    console.error('❌ KIOSK: Stack trace:', e.stack);
   }
 });
 
-// Listen for ICE candidates from admin
+// Listen for ICE candidates from admin - EXACTLY like theirs
 socket.on('webrtc-ice-candidate', async ({ candidate, sessionId: cid }) => {
   console.log('🧊 KIOSK: Received ICE from admin');
   

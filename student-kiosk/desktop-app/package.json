@@ -1,15 +1,61 @@
 {
   "name": "college-lab-kiosk",
   "version": "1.0.0",
-  "description": "Student Kiosk App",
-  "main": "main.js",
+  "description": "College Lab Management System - Student Kiosk Application",
+  "main": "main-simple.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev"
+    "dev": "electron . --inspect=9229",
+    "build": "electron-builder",
+    "dist": "electron-builder --publish=never"
+  },
+  "keywords": [
+    "electron",
+    "kiosk",
+    "lab-management",
+    "screen-sharing",
+    "webrtc"
+  ],
+  "author": "College Lab Management Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^22.0.0",
+    "electron-builder": "^24.0.0"
   },
   "dependencies": {
-    "electron": "^38.1.2",
-    "node-fetch": "^3.3.2",
-    "socket.io-client": "^4.7.2"
-  }
+    "node-fetch": "^3.3.0",
+    "socket.io-client": "^4.7.0"
+  },
+  "build": {
+    "appId": "com.college.lab.kiosk",
+    "productName": "College Lab Kiosk",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/**/*",
+      "node_modules/electron/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/college/lab-management-system.git"
+  },
+  "bugs": {
+    "url": "https://github.com/college/lab-management-system/issues"
+  },
+  "homepage": "https://github.com/college/lab-management-system#readme"
 }
