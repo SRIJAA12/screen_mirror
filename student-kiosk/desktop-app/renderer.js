@@ -2,7 +2,7 @@
 let socket = null;
 let pc = null;
 let sessionId = null;
-let serverUrl = "http://192.168.29.212:8000";
+let serverUrl = "http://10.10.194.103:8000";
 
 console.log('🎬 Renderer.js loading...');
 

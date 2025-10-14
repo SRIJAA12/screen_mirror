@@ -127,7 +127,7 @@ const row = [
 - `SESSION_FIXES_SUMMARY.md` - This documentation
 
 ### Test Steps:
-1. Open `http://192.168.29.212:8000/test-session-management.html`
+1. Open `http://10.10.194.103:8000/test-session-management.html`
 2. Test session start/export/end cycle
 3. Verify all data is properly handled
 4. Check CSV export format

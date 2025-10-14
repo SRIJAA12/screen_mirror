@@ -591,14 +591,64 @@ Contact your lab administrator for assistance.`);
         }
 
         function showForgotPasswordStep1() {
-            const studentId = prompt("🆔 Enter your Student ID (Roll Number):");
-            if (!studentId) {
-                addDebugLog('Forgot password cancelled - no student ID');
+            // Create modal dialog for student ID input
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+            modal.innerHTML = `
+                <div style="background:white;padding:30px;border-radius:15px;max-width:400px;width:90%;">
+                    <h4>🆔 Enter Student ID</h4>
+                    <input type="text" id="fpStudentId" placeholder="Student ID (e.g., IT2021005)" style="width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:5px;">
+                    <div style="display:flex;gap:10px;margin-top:20px;">
+                        <button onclick="document.body.removeChild(this.closest('div').parentElement)" style="flex:1;padding:10px;background:#6c757d;color:white;border:none;border-radius:5px;">Cancel</button>
+                        <button onclick="submitStudentId()" style="flex:1;padding:10px;background:#007bff;color:white;border:none;border-radius:5px;">Next</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('fpStudentId').focus();
+        }
+        
+        function submitStudentId() {
+            const studentId = document.getElementById('fpStudentId').value.trim();
+            if (!studentId) return;
+            
+            document.body.removeChild(document.body.lastElementChild);
+            addDebugLog(`🔍 Verifying student ID: ${studentId}`);
+            initiateForgotPassword(studentId.toUpperCase());
+        }
+        
+        function showEmailInput(studentId, studentName, maskedEmail) {
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+            modal.innerHTML = `
+                <div style="background:white;padding:30px;border-radius:15px;max-width:450px;width:90%;">
+                    <h4>📧 Enter Email Address</h4>
+                    <p><strong>Student:</strong> ${studentName}<br>
+                    <strong>Registered:</strong> ${maskedEmail}</p>
+                    <input type="email" id="fpEmail" placeholder="Enter your complete email address" style="width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:5px;">
+                    <div style="display:flex;gap:10px;margin-top:20px;">
+                        <button onclick="document.body.removeChild(this.closest('div').parentElement)" style="flex:1;padding:10px;background:#6c757d;color:white;border:none;border-radius:5px;">Cancel</button>
+                        <button onclick="submitEmail('${studentId}', '${studentName}')" style="flex:1;padding:10px;background:#007bff;color:white;border:none;border-radius:5px;">Send OTP</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('fpEmail').focus();
+        }
+        
+        function submitEmail(studentId, studentName) {
+            const email = document.getElementById('fpEmail').value.trim();
+            if (!email) return;
+            
+            // Validate email format
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                alert("❌ Invalid email format!\n\nPlease enter a valid email address.");
                 return;
             }
             
-            addDebugLog(`🔍 Verifying student ID: ${studentId}`);
-            initiateForgotPassword(studentId.toUpperCase());
+            document.body.removeChild(document.body.lastElementChild);
+            sendOTPToEmail(studentId, email, studentName);
         }
 
         async function initiateForgotPassword(studentId) {
@@ -613,28 +663,7 @@ Contact your lab administrator for assistance.`);
                 
                 if (data.success) {
                     addDebugLog(`✅ Student verified: ${data.studentName}`);
-                    
-                    const email = prompt(`📧 Enter your email address:
-
-Student: ${data.studentName}
-Registered Email: ${data.maskedEmail}
-
-Please enter your complete email address:`);
-                    
-                    if (!email) {
-                        addDebugLog('Forgot password cancelled - no email');
-                        return;
-                    }
-                    
-                    // Validate email format
-                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                    if (!emailRegex.test(email)) {
-                        alert("❌ Invalid email format!\n\nPlease enter a valid email address.");
-                        addDebugLog('Invalid email format provided');
-                        return;
-                    }
-                    
-                    sendOTPToEmail(studentId, email, data.studentName);
+                    showEmailInput(studentId, data.studentName, data.maskedEmail);
                     
                 } else {
                     alert(`❌ Student Verification Failed:
@@ -702,43 +731,58 @@ Please check:
         }
 
         async function verifyOTPAndResetPassword(studentId, email, studentName) {
-            const otp = prompt(`🔐 Enter the 6-digit OTP:
-
-Student: ${studentName}
-Email: ${email}
-
-Please enter the OTP you received in your email:`);
+            showOTPInput(studentId, email, studentName);
+        }
+        
+        function showOTPInput(studentId, email, studentName) {
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+            modal.innerHTML = `
+                <div style="background:white;padding:30px;border-radius:15px;max-width:450px;width:90%;">
+                    <h4>🔐 Enter OTP & New Password</h4>
+                    <p><strong>Student:</strong> ${studentName}<br>
+                    <strong>Email:</strong> ${email}</p>
+                    <input type="text" id="fpOTP" placeholder="Enter 6-digit OTP" maxlength="6" style="width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:5px;">
+                    <input type="password" id="fpNewPassword" placeholder="Enter new password (min 6 chars)" style="width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:5px;">
+                    <div style="display:flex;gap:10px;margin-top:20px;">
+                        <button onclick="document.body.removeChild(this.closest('div').parentElement)" style="flex:1;padding:10px;background:#6c757d;color:white;border:none;border-radius:5px;">Cancel</button>
+                        <button onclick="submitOTPAndPassword('${studentId}', '${email}', '${studentName}')" style="flex:1;padding:10px;background:#28a745;color:white;border:none;border-radius:5px;">Reset Password</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('fpOTP').focus();
+        }
+        
+        function submitOTPAndPassword(studentId, email, studentName) {
+            const otp = document.getElementById('fpOTP').value.trim();
+            const newPassword = document.getElementById('fpNewPassword').value;
             
             if (!otp) {
-                addDebugLog('Forgot password cancelled - no OTP');
+                alert("Please enter the OTP");
                 return;
             }
             
-            // Validate OTP format
             if (!/^\d{6}$/.test(otp)) {
                 alert("❌ Invalid OTP format!\n\nOTP must be exactly 6 digits.\nExample: 123456");
-                addDebugLog('Invalid OTP format provided');
                 return;
             }
             
-            const newPassword = prompt(`🔐 Enter your new password:
-
-Password Requirements:
-- At least 6 characters long
-- Can contain letters, numbers, and symbols
-
-Please enter your new password:`);
-            
             if (!newPassword) {
-                addDebugLog('Forgot password cancelled - no new password');
+                alert("Please enter a new password");
                 return;
             }
             
             if (newPassword.length < 6) {
                 alert("❌ Password too short!\n\nPassword must be at least 6 characters long.");
-                addDebugLog('Password too short');
                 return;
             }
+            
+            document.body.removeChild(document.body.lastElementChild);
+            finalizePasswordReset(studentId, email, otp, newPassword, studentName);
+        }
+        
+        async function finalizePasswordReset(studentId, email, otp, newPassword, studentName) {
             
             // Verify OTP and reset password
             try {

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Session Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .debug-section {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .highlight {
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Session Debug Tool</h1>
+    
+    <div class="debug-section">
+        <h2>📊 Current Session Status</h2>
+        <button onclick="checkCurrentSession()">🔍 Check Current Session</button>
+        <div id="currentSessionResult"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>👥 Student Login Test</h2>
+        <p>Test if Vikram Singh is properly tracked:</p>
+        <button onclick="checkVikramStatus()">👤 Check Vikram Singh Status</button>
+        <div id="vikramResult"></div>
+    </div>
+    
+    <div class="debug-section">
+        <h2>📈 Export Test</h2>
+        <p>Test CSV export data:</p>
+        <button onclick="testExport()">📊 Test Export Data</button>
+        <div id="exportResult"></div>
+    </div>
+
+    <script>
+        async function checkCurrentSession() {
+            const resultDiv = document.getElementById('currentSessionResult');
+            resultDiv.innerHTML = '🔍 Checking current session...';
+            
+            try {
+                const response = await fetch('/api/debug-current-session');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const debug = data.debug;
+                    resultDiv.innerHTML = `
+                        <div class="highlight">
+                            <strong>📊 Session Summary:</strong><br>
+                            • Active Lab Session: ${debug.activeLabSession ? '✅ YES' : '❌ NO'}<br>
+                            • Lab Session Students: ${debug.counts.labSessionStudents}<br>
+                            • Active Individual Sessions: ${debug.counts.activeIndividualSessions}<br>
+                            • Recent Individual Sessions: ${debug.counts.recentIndividualSessions}
+                        </div>
+                        
+                        <h4>🏫 Active Lab Session:</h4>
+                        <pre>${JSON.stringify(debug.activeLabSession, null, 2)}</pre>
+                        
+                        <h4>👥 Lab Session Student Records:</h4>
+                        <pre>${JSON.stringify(debug.activeLabSessionStudentRecords, null, 2)}</pre>
+                        
+                        <h4>🔄 Active Individual Sessions:</h4>
+                        <pre>${JSON.stringify(debug.activeIndividualSessions, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div style="color: red;">❌ Error: ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div style="color: red;">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function checkVikramStatus() {
+            const resultDiv = document.getElementById('vikramResult');
+            resultDiv.innerHTML = '👤 Checking Vikram Singh status...';
+            
+            try {
+                const response = await fetch('/api/debug-current-session');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const debug = data.debug;
+                    
+                    // Check in lab session records
+                    const labSessionVikram = debug.activeLabSessionStudentRecords ? 
+                        debug.activeLabSessionStudentRecords.find(s => s.studentName && s.studentName.toLowerCase().includes('vikram')) : null;
+                    
+                    // Check in individual sessions
+                    const individualVikram = debug.activeIndividualSessions.find(s => 
+                        s.studentName && s.studentName.toLowerCase().includes('vikram'));
+                    
+                    resultDiv.innerHTML = `
+                        <div class="highlight">
+                            <strong>👤 Vikram Singh Status:</strong><br>
+                            • In Lab Session Records: ${labSessionVikram ? '✅ YES' : '❌ NO'}<br>
+                            • In Individual Sessions: ${individualVikram ? '✅ YES' : '❌ NO'}
+                        </div>
+                        
+                        ${labSessionVikram ? `
+                            <h4>🏫 Lab Session Record:</h4>
+                            <pre>${JSON.stringify(labSessionVikram, null, 2)}</pre>
+                        ` : ''}
+                        
+                        ${individualVikram ? `
+                            <h4>👤 Individual Session Record:</h4>
+                            <pre>${JSON.stringify(individualVikram, null, 2)}</pre>
+                        ` : ''}
+                        
+                        ${!labSessionVikram && !individualVikram ? `
+                            <div style="color: red; padding: 10px; background: #f8d7da; border-radius: 4px;">
+                                ❌ Vikram Singh not found in any records!<br>
+                                This explains why CSV export is empty.
+                            </div>
+                        ` : ''}
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div style="color: red;">❌ Error: ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div style="color: red;">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testExport() {
+            const resultDiv = document.getElementById('exportResult');
+            resultDiv.innerHTML = '📊 Testing export data...';
+            
+            try {
+                // First get current session
+                const sessionResponse = await fetch('/api/debug-current-session');
+                const sessionData = await sessionResponse.json();
+                
+                if (!sessionData.success || !sessionData.debug.activeLabSession) {
+                    resultDiv.innerHTML = `<div style="color: red;">❌ No active lab session found!</div>`;
+                    return;
+                }
+                
+                const sessionId = sessionData.debug.activeLabSession._id;
+                
+                // Test export
+                const exportResponse = await fetch(`/api/export-session-data/${sessionId}`);
+                const exportData = await exportResponse.json();
+                
+                if (exportData.success) {
+                    resultDiv.innerHTML = `
+                        <div class="highlight">
+                            <strong>📊 Export Test Results:</strong><br>
+                            • Student Records Found: ${exportData.studentRecords.length}<br>
+                            • Students: ${exportData.studentRecords.map(s => s.studentName).join(', ') || 'None'}
+                        </div>
+                        
+                        <h4>📋 Session Data:</h4>
+                        <pre>${JSON.stringify(exportData.sessionData, null, 2)}</pre>
+                        
+                        <h4>👥 Student Records:</h4>
+                        <pre>${JSON.stringify(exportData.studentRecords, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div style="color: red;">❌ Export Error: ${exportData.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div style="color: red;">❌ Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

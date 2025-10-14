@@ -330,6 +330,9 @@
                 <button class="btn btn-secondary" onclick="debugSessionData()" style="background: #ffc107; color: #000;">
                     🔍 Debug Data
                 </button>
+                <button class="btn btn-warning" onclick="forceClearSessions()" style="background: #dc3545; color: white;">
+                    🧹 Force Clear All
+                </button>
             </div>
 
             <!-- Session Info -->
@@ -397,7 +400,7 @@
         function initializeSocket() {
             console.log('🚀 Admin dashboard loading...');
             
-            socket = io('http://192.168.29.212:8000');
+            socket = io('http://10.10.194.103:8000');
             
             socket.on('connect', () => {
                 console.log('✅ Admin dashboard connected:', socket.id);
@@ -1230,6 +1233,41 @@ ${data.debug.labSessionStudentRecords?.map((s, i) =>
             .catch(error => {
                 console.error('Error getting debug data:', error);
                 alert('❌ Error getting debug data. Check console for details.');
+            });
+        }
+
+        // Force clear all sessions
+        function forceClearSessions() {
+            if (!confirm('⚠️ WARNING: This will clear ALL lab sessions and student data!\n\nAre you sure you want to continue?')) {
+                return;
+            }
+            
+            console.log('🧹 Force clearing all sessions...');
+            
+            fetch('/api/force-clear-all', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ All sessions cleared successfully!\n\nYou can now start a new lab session.');
+                    // Reset UI
+                    currentLabSession = null;
+                    sessionActive = false;
+                    document.getElementById('session-info').style.display = 'none';
+                    document.getElementById('startSessionBtn').disabled = false;
+                    document.getElementById('endSessionBtn').disabled = true;
+                    refreshStudentList();
+                } else {
+                    alert('❌ Failed to clear sessions: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error clearing sessions:', error);
+                alert('❌ Error clearing sessions. Check console for details.');
             });
         }
 

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Cleanup</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .cleanup-section {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #c82333;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧹 Database Cleanup Tool</h1>
+    
+    <div class="warning">
+        <strong>⚠️ Warning:</strong> This tool will clean up problematic database entries that may be causing validation errors.
+    </div>
+    
+    <div class="cleanup-section">
+        <h2>🗑️ Clean Up Lab Sessions</h2>
+        <p>This will remove any lab sessions that have missing required fields (year, department, section) which can cause validation errors during student login.</p>
+        <button onclick="cleanupLabSessions()">🧹 Clean Lab Sessions</button>
+        <div id="labSessionResult"></div>
+    </div>
+    
+    <div class="cleanup-section">
+        <h2>📊 Check Current Status</h2>
+        <p>View current lab sessions and their status.</p>
+        <button onclick="checkLabSessions()" style="background: #28a745;">📋 Check Lab Sessions</button>
+        <div id="statusResult"></div>
+    </div>
+    
+    <div class="cleanup-section">
+        <h2>🔄 Restart Fresh</h2>
+        <p>Clear all lab sessions and start completely fresh. <strong>Use with caution!</strong></p>
+        <button onclick="clearAllLabSessions()" style="background: #6c757d;">🗑️ Clear All Lab Sessions</button>
+        <div id="clearResult"></div>
+    </div>
+
+    <script>
+        async function cleanupLabSessions() {
+            const resultDiv = document.getElementById('labSessionResult');
+            resultDiv.innerHTML = '🧹 Cleaning up problematic lab sessions...';
+            
+            try {
+                const response = await fetch('http://10.10.194.103:8000/api/cleanup-lab-sessions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ Cleanup successful!<br>
+                            Removed ${data.deletedCount} problematic lab sessions.<br>
+                            You can now try student login again.
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">❌ Cleanup failed: ${data.error}</div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">❌ Error: ${error.message}</div>
+                `;
+            }
+        }
+
+        async function checkLabSessions() {
+            const resultDiv = document.getElementById('statusResult');
+            resultDiv.innerHTML = '📊 Checking lab sessions...';
+            
+            try {
+                // This is a simple check - we'll just try to fetch active sessions
+                const response = await fetch('http://10.10.194.103:8000/api/active-sessions/all');
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <h4>Current Status:</h4>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">❌ Error checking status: ${error.message}</div>
+                `;
+            }
+        }
+
+        async function clearAllLabSessions() {
+            if (!confirm('⚠️ Are you sure you want to clear ALL lab sessions?\n\nThis cannot be undone!')) {
+                return;
+            }
+            
+            const resultDiv = document.getElementById('clearResult');
+            resultDiv.innerHTML = '🗑️ Clearing all lab sessions...';
+            
+            try {
+                // We'll use the end session API to clear any active sessions
+                const response = await fetch('http://10.10.194.103:8000/api/end-lab-session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ sessionId: 'force-clear' })
+                });
+                
+                // Then cleanup any remaining problematic ones
+                await cleanupLabSessions();
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        ✅ All lab sessions cleared!<br>
+                        Database is now clean and ready for fresh sessions.
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">❌ Error: ${error.message}</div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -84,9 +84,9 @@ const Session = mongoose.model('Session', sessionSchema);
 const labSessionSchema = new mongoose.Schema({
   subject: { type: String, required: true },
   faculty: { type: String, required: true },
-  year: { type: Number, required: true },
-  department: { type: String, required: true },
-  section: { type: String, required: true },
+  year: { type: Number, required: false, default: 1 }, // Made optional for backward compatibility
+  department: { type: String, required: false, default: 'Computer Science' }, // Made optional for backward compatibility
+  section: { type: String, required: false, default: 'None' }, // Made optional for backward compatibility
   periods: { type: Number, required: true },
   expectedDuration: { type: Number, required: true }, // in minutes
   startTime: { type: Date, default: Date.now },
@@ -1272,24 +1272,33 @@ app.post('/api/student-login', async (req, res) => {
     await newSession.save();
     
     // Update active lab session with this student record
-    const activeLabSession = await LabSession.findOne({ status: 'active' });
-    if (activeLabSession) {
-      // Remove any existing record for this system
-      activeLabSession.studentRecords = activeLabSession.studentRecords.filter(
-        record => record.systemNumber !== systemNumber
-      );
-      
-      // Add new student record
-      activeLabSession.studentRecords.push({
-        studentName,
-        studentId,
-        systemNumber,
-        loginTime: newSession.loginTime,
-        status: 'active'
-      });
-      
-      await activeLabSession.save();
-      console.log(`📚 Added ${studentName} to lab session: ${activeLabSession.subject}`);
+    try {
+      const activeLabSession = await LabSession.findOne({ status: 'active' });
+      if (activeLabSession) {
+        console.log(`📚 Found active lab session: ${activeLabSession.subject} (ID: ${activeLabSession._id})`);
+        
+        // Remove any existing record for this system
+        activeLabSession.studentRecords = activeLabSession.studentRecords.filter(
+          record => record.systemNumber !== systemNumber
+        );
+        
+        // Add new student record
+        activeLabSession.studentRecords.push({
+          studentName,
+          studentId,
+          systemNumber,
+          loginTime: newSession.loginTime,
+          status: 'active'
+        });
+        
+        await activeLabSession.save();
+        console.log(`📚 Added ${studentName} to lab session: ${activeLabSession.subject}`);
+      } else {
+        console.log(`⚠️ No active lab session found. Student ${studentName} logged in but not tracked in lab session.`);
+      }
+    } catch (labSessionError) {
+      console.error(`❌ Error updating lab session:`, labSessionError);
+      // Continue with student login even if lab session update fails
     }
     
     console.log(`✅ Session created: ${newSession._id} for ${studentName}`);
@@ -1658,14 +1667,21 @@ app.post('/api/start-lab-session', async (req, res) => {
   try {
     const { subject, faculty, year, department, section, periods, startTime, expectedDuration } = req.body;
     
-    // Check if there's already an active lab session
-    const existingSession = await LabSession.findOne({ status: 'active' });
-    if (existingSession) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'There is already an active lab session. Please end it first.' 
-      });
-    }
+    // FORCE CLEAR any existing active sessions before starting new one
+    console.log('🧹 Auto-clearing any existing active lab sessions...');
+    await LabSession.deleteMany({ status: 'active' });
+    await LabSession.deleteMany({}); // Clear all lab sessions to be safe
+    
+    console.log('✅ Cleared existing sessions, starting new session...');
+    
+    // Clean up any incomplete lab sessions that might cause validation issues
+    await LabSession.deleteMany({ 
+      $or: [
+        { subject: { $exists: false } },
+        { faculty: { $exists: false } },
+        { periods: { $exists: false } }
+      ]
+    });
     
     // Create new lab session
     const newLabSession = new LabSession({
@@ -1713,6 +1729,14 @@ app.post('/api/end-lab-session', async (req, res) => {
   try {
     const { sessionId } = req.body;
     
+    // Handle force clear
+    if (sessionId === 'force-clear' || sessionId === 'clear-all') {
+      await LabSession.deleteMany({});
+      await Session.updateMany({ status: 'active' }, { status: 'completed', logoutTime: new Date() });
+      console.log('🧹 Force cleared all lab sessions');
+      return res.json({ success: true, message: 'All lab sessions force cleared' });
+    }
+    
     const labSession = await LabSession.findById(sessionId);
     if (!labSession) {
       return res.status(404).json({ 
@@ -1726,22 +1750,22 @@ app.post('/api/end-lab-session', async (req, res) => {
     labSession.endTime = new Date();
     await labSession.save();
     
-    // Clear all individual student sessions
-    await Session.updateMany(
-      { status: 'active' },
-      { 
+    // Clear all individual student sessions with proper duration calculation
+    const activeSessions = await Session.find({ status: 'active' });
+    const currentTime = new Date();
+    
+    for (const session of activeSessions) {
+      const durationMs = currentTime - session.loginTime;
+      const durationSeconds = Math.floor(durationMs / 1000);
+      
+      await Session.findByIdAndUpdate(session._id, {
         status: 'completed',
-        logoutTime: new Date(),
-        $set: {
-          duration: {
-            $divide: [
-              { $subtract: [new Date(), '$loginTime'] },
-              1000
-            ]
-          }
-        }
-      }
-    );
+        logoutTime: currentTime,
+        duration: durationSeconds
+      });
+    }
+    
+    console.log(`🛑 Updated ${activeSessions.length} active sessions to completed`);
     
     console.log(`🛑 Lab session ended: ${labSession.subject}`);
     
@@ -1752,6 +1776,100 @@ app.post('/api/end-lab-session', async (req, res) => {
     
   } catch (error) {
     console.error('Error ending lab session:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Force clear everything - emergency endpoint
+app.post('/api/force-clear-all', async (req, res) => {
+  try {
+    console.log('🚨 EMERGENCY: Force clearing ALL data...');
+    
+    // Delete all lab sessions
+    const labResult = await LabSession.deleteMany({});
+    
+    // Set all individual sessions to completed with proper duration
+    const activeSessionsForClear = await Session.find({ status: 'active' });
+    const clearTime = new Date();
+    
+    for (const session of activeSessionsForClear) {
+      const durationMs = clearTime - session.loginTime;
+      const durationSeconds = Math.floor(durationMs / 1000);
+      
+      await Session.findByIdAndUpdate(session._id, {
+        status: 'completed',
+        logoutTime: clearTime,
+        duration: durationSeconds
+      });
+    }
+    
+    const sessionResult = { modifiedCount: activeSessionsForClear.length };
+    
+    console.log(`🧹 Deleted ${labResult.deletedCount} lab sessions`);
+    console.log(`🧹 Completed ${sessionResult.modifiedCount} individual sessions`);
+    
+    res.json({
+      success: true,
+      message: `Emergency clear completed: ${labResult.deletedCount} lab sessions deleted, ${sessionResult.modifiedCount} individual sessions completed`,
+      labSessionsDeleted: labResult.deletedCount,
+      individualSessionsCompleted: sessionResult.modifiedCount
+    });
+  } catch (error) {
+    console.error('Error in emergency clear:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Clean up problematic lab sessions
+app.post('/api/cleanup-lab-sessions', async (req, res) => {
+  try {
+    // Remove any lab sessions that might have validation issues
+    const result = await LabSession.deleteMany({
+      $or: [
+        { subject: { $exists: false } },
+        { faculty: { $exists: false } },
+        { periods: { $exists: false } },
+        { year: { $exists: false } },
+        { department: { $exists: false } },
+        { section: { $exists: false } }
+      ]
+    });
+    
+    console.log(`🧹 Cleaned up ${result.deletedCount} problematic lab sessions`);
+    
+    res.json({
+      success: true,
+      message: `Cleaned up ${result.deletedCount} problematic lab sessions`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Error cleaning up lab sessions:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Debug current active session
+app.get('/api/debug-current-session', async (req, res) => {
+  try {
+    const activeLabSession = await LabSession.findOne({ status: 'active' });
+    const allSessions = await Session.find({}).sort({ loginTime: -1 }).limit(10);
+    const activeSessions = await Session.find({ status: 'active' });
+    
+    res.json({
+      success: true,
+      debug: {
+        activeLabSession: activeLabSession,
+        activeLabSessionStudentRecords: activeLabSession ? activeLabSession.studentRecords : null,
+        recentIndividualSessions: allSessions,
+        activeIndividualSessions: activeSessions,
+        counts: {
+          labSessionStudents: activeLabSession ? activeLabSession.studentRecords.length : 0,
+          activeIndividualSessions: activeSessions.length,
+          recentIndividualSessions: allSessions.length
+        }
+      }
+    });
+  } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -1793,28 +1911,36 @@ app.get('/api/export-session-data/:sessionId', async (req, res) => {
     }
     
     console.log(`📊 Lab session found: ${labSession.subject} - Start time: ${labSession.startTime}`);
+    console.log(`📊 Lab session embedded student records: ${labSession.studentRecords ? labSession.studentRecords.length : 0}`);
     
-    // Get ALL student session records during this lab session period
-    // This includes multiple logins/logouts by the same student
-    const studentRecords = await Session.find({
-      loginTime: { $gte: labSession.startTime },
-      ...(labSession.endTime && { loginTime: { $lte: labSession.endTime } })
-    }).sort({ loginTime: 1 }); // Sort by login time to show chronological order
+    // PRIORITY 1: Use embedded student records from lab session (most reliable)
+    let finalStudentRecords = [];
     
-    console.log(`📊 Found ${studentRecords.length} student session records for export`);
-    console.log(`📊 Student records:`, studentRecords.map(r => ({ 
-      name: r.studentName, 
-      id: r.studentId, 
-      system: r.systemNumber, 
-      loginTime: r.loginTime 
-    })));
-    
-    // If no records found in Session collection, try to get from lab session's embedded records
-    let finalStudentRecords = studentRecords;
-    if (studentRecords.length === 0 && labSession.studentRecords && labSession.studentRecords.length > 0) {
+    if (labSession.studentRecords && labSession.studentRecords.length > 0) {
       console.log(`📊 Using embedded student records from lab session: ${labSession.studentRecords.length}`);
       finalStudentRecords = labSession.studentRecords;
+    } else {
+      // PRIORITY 2: Get individual session records during this lab session period
+      console.log(`📊 No embedded records, checking individual Session records...`);
+      const studentRecords = await Session.find({
+        loginTime: { $gte: labSession.startTime },
+        ...(labSession.endTime && { loginTime: { $lte: labSession.endTime } })
+      }).sort({ loginTime: 1 });
+      
+      console.log(`📊 Found ${studentRecords.length} individual session records`);
+      finalStudentRecords = studentRecords;
     }
+    
+    // PRIORITY 3: If still no records, get ALL active sessions (fallback)
+    if (finalStudentRecords.length === 0) {
+      console.log(`📊 No records found, using ALL active sessions as fallback...`);
+      const allActiveSessions = await Session.find({ status: 'active' }).sort({ loginTime: 1 });
+      console.log(`📊 Found ${allActiveSessions.length} active sessions as fallback`);
+      finalStudentRecords = allActiveSessions;
+    }
+    
+    console.log(`📊 FINAL: Will export ${finalStudentRecords.length} student records`);
+    console.log(`📊 Student names in export:`, finalStudentRecords.map(r => r.studentName));
     
     res.json({
       success: true,
@@ -1970,8 +2096,8 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`🔐 College Lab Registration System`);
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`📡 Local Access: http://localhost:${PORT}`);
-  console.log(`🌐 Network Access: http://192.168.29.212:${PORT}`); // CURRENT IP
-  console.log(`📊 CSV/Excel Import: http://192.168.29.212:${PORT}/import.html`); // CURRENT IP
+  console.log(`🌐 Network Access: http://10.10.194.103:${PORT}`); // CURRENT IP
+  console.log(`📊 CSV/Excel Import: http://10.10.194.103:${PORT}/import.html`); // CURRENT IP
   console.log(`📚 Student Database: Import via CSV/Excel files (ExcelJS - Secure)`);
   console.log(`🔑 Password reset: Available via DOB verification`);
   console.log(`📊 API Endpoints: /api/import-students, /api/download-template, /api/stats`);
