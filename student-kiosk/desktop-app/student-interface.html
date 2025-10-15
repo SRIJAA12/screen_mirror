@@ -213,11 +213,11 @@
                 <form id="loginForm">
                     <div class="mb-4">
                         <label class="form-label fw-bold"><i class="fas fa-user"></i> Student ID</label>
-                        <input type="text" class="form-control form-control-lg" id="studentId" placeholder="Enter your Student ID" required />
+                        <input type="text" class="form-control form-control-lg" id="studentId" placeholder="Enter your Student ID" required autocomplete="off" spellcheck="false" />
                     </div>
                     <div class="mb-4">
                         <label class="form-label fw-bold"><i class="fas fa-key"></i> Password</label>
-                        <input type="password" class="form-control form-control-lg" id="password" placeholder="Enter your Password" required />
+                        <input type="password" class="form-control form-control-lg" id="password" placeholder="Enter your Password" required autocomplete="off" />
                     </div>
                     <div class="mb-4">
                         <label class="form-label fw-bold"><i class="fas fa-desktop"></i> System Number</label>
@@ -254,17 +254,21 @@
                         <i class="fas fa-key"></i> Forgot Password?
                     </button>
                     
-                    <!-- NEW: First-time Sign-in Button -->
-                    <button type="button" class="btn btn-warning btn-lg mt-2 w-100" onclick="goToFirstTimeSignin()">
-                        <i class="fas fa-user-plus"></i> First-time Sign-in
-                    </button>
+                    <!-- NEW: First-time Sign-in Info -->
+                    <div class="alert alert-info mt-2">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>First-time Sign-in:</strong> 
+                        <a href="http://10.10.194.103:8000/student-signin/" target="_blank" class="alert-link">
+                            Complete setup online first
+                        </a>
+                    </div>
                 </form>
 
                 <!-- NEW: Help Section -->
                 <div class="forgot-password-section">
                     <h6 class="text-warning mb-2"><i class="fas fa-lightbulb"></i> Need Help?</h6>
                     <p class="text-muted small mb-2">
-                        <strong>First-time Sign-in:</strong> If you're logging in for the first time, click "First-time Sign-in" to set up your password.
+                        <strong>First-time Sign-in:</strong> Complete your password setup online first at the link above.
                     </p>
                     <p class="text-muted small mb-0">
                         <strong>Forgot Password:</strong> If you forgot your password, click "Forgot Password?" and follow the email verification process.
@@ -578,11 +582,7 @@ Contact your lab administrator for assistance.`);
 
         updateConnectionStatus(false);
 
-        // NEW: Navigation Functions
-        function goToFirstTimeSignin() {
-            addDebugLog('👤 Navigating to first-time sign-in page');
-            window.location.href = 'first-signin.html';
-        }
+        // NEW: Navigation Functions (removed - now using web-based system)
 
         // NEW: Enhanced Forgot Password Functions with OTP verification
         function showForgotPassword() {
@@ -653,7 +653,7 @@ Contact your lab administrator for assistance.`);
 
         async function initiateForgotPassword(studentId) {
             try {
-                const response = await fetch('/api/forgot-password-initiate', {
+                const response = await fetch('http://10.10.194.103:8000/api/forgot-password-initiate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ studentId })
@@ -687,7 +687,7 @@ Please check:
             try {
                 addDebugLog(`📧 Sending OTP to email: ${email}`);
                 
-                const response = await fetch('/api/forgot-password-send-otp', {
+                const response = await fetch('http://10.10.194.103:8000/api/forgot-password-send-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ studentId, email })
@@ -705,7 +705,11 @@ Dear ${studentName},
 An OTP (One-Time Password) has been sent to:
 ${email}
 
-Please check your email and enter the 6-digit OTP in the next step.
+🔍 TESTING MODE: Since email is not configured, 
+check the SERVER CONSOLE for the OTP code.
+
+The OTP will be displayed in the terminal where 
+you started the server (node app.js).
 
 Note: OTP will expire in 10 minutes.`);
                     
@@ -738,20 +742,91 @@ Please check:
             const modal = document.createElement('div');
             modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
             modal.innerHTML = `
-                <div style="background:white;padding:30px;border-radius:15px;max-width:450px;width:90%;">
-                    <h4>🔐 Enter OTP & New Password</h4>
-                    <p><strong>Student:</strong> ${studentName}<br>
-                    <strong>Email:</strong> ${email}</p>
-                    <input type="text" id="fpOTP" placeholder="Enter 6-digit OTP" maxlength="6" style="width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:5px;">
-                    <input type="password" id="fpNewPassword" placeholder="Enter new password (min 6 chars)" style="width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:5px;">
+                <div style="background:white;padding:30px;border-radius:15px;max-width:500px;width:90%;box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+                    <h4 style="color:#28a745;margin-bottom:20px;">🔐 Enter OTP & New Password</h4>
+                    <div style="background:#f8f9fa;padding:15px;border-radius:8px;margin-bottom:20px;">
+                        <p style="margin:0;"><strong>Student:</strong> ${studentName}<br>
+                        <strong>Email:</strong> ${email}</p>
+                    </div>
+                    
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block;margin-bottom:5px;font-weight:bold;color:#333;">6-Digit OTP Code:</label>
+                        <input type="text" id="fpOTP" placeholder="000000" maxlength="6" 
+                               style="width:100%;padding:15px;font-size:18px;text-align:center;letter-spacing:3px;border:2px solid #28a745;border-radius:8px;background:#fff;"
+                               autocomplete="off" spellcheck="false">
+                        <small style="color:#666;display:block;margin-top:5px;">📧 Check your email or server console for the OTP code</small>
+                    </div>
+                    
+                    <div style="margin-bottom:20px;">
+                        <label style="display:block;margin-bottom:5px;font-weight:bold;color:#333;">New Password:</label>
+                        <input type="password" id="fpNewPassword" placeholder="Enter new password (min 6 chars)" 
+                               style="width:100%;padding:15px;font-size:16px;border:2px solid #ddd;border-radius:8px;"
+                               onkeypress="if(event.key==='Enter'){submitOTPAndPassword('${studentId}', '${email}', '${studentName}')}">
+                    </div>
+                    
                     <div style="display:flex;gap:10px;margin-top:20px;">
-                        <button onclick="document.body.removeChild(this.closest('div').parentElement)" style="flex:1;padding:10px;background:#6c757d;color:white;border:none;border-radius:5px;">Cancel</button>
-                        <button onclick="submitOTPAndPassword('${studentId}', '${email}', '${studentName}')" style="flex:1;padding:10px;background:#28a745;color:white;border:none;border-radius:5px;">Reset Password</button>
+                        <button onclick="document.body.removeChild(this.closest('div').parentElement)" 
+                                style="flex:1;padding:15px;background:#6c757d;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer;">Cancel</button>
+                        <button onclick="submitOTPAndPassword('${studentId}', '${email}', '${studentName}')" 
+                                style="flex:1;padding:15px;background:#28a745;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer;">Reset Password</button>
+                    </div>
+                    
+                    <div style="margin-top:15px;padding:10px;background:#fff3cd;border-radius:5px;border-left:4px solid #ffc107;">
+                        <small style="color:#856404;">
+                            <strong>💡 Testing Mode:</strong> Check the server console for the OTP code since email is not configured.
+                        </small>
                     </div>
                 </div>
             `;
             document.body.appendChild(modal);
-            document.getElementById('fpOTP').focus();
+            
+            // Enhanced focus and event handling for better responsiveness
+            setTimeout(() => {
+                const otpInput = document.getElementById('fpOTP');
+                const passwordInput = document.getElementById('fpNewPassword');
+                
+                if (otpInput) {
+                    // Force focus and make it responsive
+                    otpInput.focus();
+                    otpInput.select();
+                    
+                    // Add better event handlers
+                    otpInput.addEventListener('input', function(e) {
+                        // Only allow numbers
+                        this.value = this.value.replace(/[^0-9]/g, '');
+                        
+                        // Auto-advance to password field when 6 digits entered
+                        if (this.value.length === 6 && passwordInput) {
+                            setTimeout(() => passwordInput.focus(), 100);
+                        }
+                    });
+                    
+                    // Handle paste events
+                    otpInput.addEventListener('paste', function(e) {
+                        setTimeout(() => {
+                            this.value = this.value.replace(/[^0-9]/g, '').substring(0, 6);
+                            if (this.value.length === 6 && passwordInput) {
+                                setTimeout(() => passwordInput.focus(), 100);
+                            }
+                        }, 10);
+                    });
+                    
+                    // Handle click to ensure focus
+                    otpInput.addEventListener('click', function() {
+                        this.focus();
+                        this.select();
+                    });
+                }
+                
+                // Make password field more responsive
+                if (passwordInput) {
+                    passwordInput.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') {
+                            submitOTPAndPassword('${studentId}', '${email}', '${studentName}');
+                        }
+                    });
+                }
+            }, 200);
         }
         
         function submitOTPAndPassword(studentId, email, studentName) {
@@ -788,7 +863,7 @@ Please check:
             try {
                 addDebugLog(`🔄 Verifying OTP and resetting password for: ${studentId}`);
                 
-                const response = await fetch('/api/forgot-password-verify-otp', {
+                const response = await fetch('http://10.10.194.103:8000/api/forgot-password-verify-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -839,6 +914,49 @@ Please check:
                 addDebugLog(`❌ Network error: ${error.message}`);
             }
         }
+        // Enhanced input field responsiveness
+        document.addEventListener('DOMContentLoaded', function() {
+            // Make all input fields more responsive
+            const inputs = document.querySelectorAll('input[type="text"], input[type="password"], input[type="email"]');
+            
+            inputs.forEach(input => {
+                // Remove any delays and make inputs more responsive
+                input.addEventListener('focus', function() {
+                    this.style.outline = '2px solid #007bff';
+                    this.style.outlineOffset = '2px';
+                });
+                
+                input.addEventListener('blur', function() {
+                    this.style.outline = 'none';
+                });
+                
+                // Ensure immediate response to typing
+                input.addEventListener('input', function() {
+                    // Force immediate update
+                    this.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                
+                // Handle click to ensure focus
+                input.addEventListener('click', function() {
+                    setTimeout(() => {
+                        this.focus();
+                        if (this.type === 'text') {
+                            this.select();
+                        }
+                    }, 10);
+                });
+            });
+            
+            // Auto-focus on student ID field when page loads
+            setTimeout(() => {
+                const studentIdInput = document.getElementById('studentId');
+                if (studentIdInput) {
+                    studentIdInput.focus();
+                    studentIdInput.select();
+                }
+            }, 500);
+        });
+
     </script>
 </body>
 </html>

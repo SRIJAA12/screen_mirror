@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Check Student Data</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .content {
+            padding: 30px;
+        }
+        .btn {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin: 5px;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+        }
+        .result {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        .student-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Student Data Checker</h1>
+            <p>Check what students exist and their email addresses</p>
+        </div>
+
+        <div class="content">
+            <h3>📊 Check All Students</h3>
+            <button class="btn" onclick="loadAllStudents()">📋 Load All Students</button>
+            <button class="btn btn-success" onclick="addTestStudent()">➕ Add TEST2025001</button>
+            <button class="btn btn-danger" onclick="clearAllStudents()">🗑️ Clear All Students</button>
+
+            <div id="studentsResult" class="result"></div>
+
+            <h3>🔍 Check Specific Student</h3>
+            <input type="text" id="studentId" placeholder="Enter Student ID (e.g., TEST2025001)" style="text-transform: uppercase;">
+            <button class="btn" onclick="checkSpecificStudent()">🔍 Check Student</button>
+
+            <div id="specificResult" class="result"></div>
+
+            <h3>📧 Test Email Sending</h3>
+            <input type="text" id="testStudentId" placeholder="Student ID" style="text-transform: uppercase;">
+            <input type="email" id="testEmail" placeholder="Email address to test">
+            <button class="btn btn-success" onclick="testEmailSending()">📧 Send Test OTP</button>
+
+            <div id="emailResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const SERVER_URL = 'http://10.10.194.103:8000';
+
+        async function loadAllStudents() {
+            showResult('studentsResult', '🔄 Loading all students...', 'info');
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/debug-students`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    let resultText = `📊 Found ${data.count} students:\n\n`;
+                    
+                    if (data.students.length === 0) {
+                        resultText += '❌ No students found in database!\n\nYou need to add students first.';
+                    } else {
+                        data.students.forEach((student, index) => {
+                            resultText += `${index + 1}. ${student.studentId} - ${student.name}\n`;
+                            resultText += `   📧 Email: ${student.email}\n`;
+                            resultText += `   🏫 Department: ${student.department}\n`;
+                            resultText += `   🔐 Password Set: ${student.isPasswordSet ? 'Yes' : 'No'}\n\n`;
+                        });
+                    }
+                    
+                    showResult('studentsResult', resultText, 'success');
+                } else {
+                    showResult('studentsResult', `❌ Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('studentsResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function addTestStudent() {
+            showResult('studentsResult', '➕ Adding TEST2025001...', 'info');
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/add-student`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        studentId: 'TEST2025001',
+                        name: 'Test User',
+                        email: '24z258@psgitech.ac.in', // Your email
+                        dateOfBirth: '2000-01-01',
+                        department: 'Computer Science',
+                        year: 3,
+                        labId: 'CC1'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('studentsResult', 
+                        `✅ TEST2025001 added successfully!\n\n` +
+                        `👤 Name: ${data.student.name}\n` +
+                        `📧 Email: ${data.student.email}\n` +
+                        `🏫 Department: ${data.student.department}\n` +
+                        `🔬 Lab: ${data.student.labId}\n\n` +
+                        `Now you can test forgot password with this student!`, 'success');
+                } else {
+                    showResult('studentsResult', `❌ Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('studentsResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkSpecificStudent() {
+            const studentId = document.getElementById('studentId').value.trim().toUpperCase();
+            
+            if (!studentId) {
+                showResult('specificResult', 'Please enter a student ID', 'error');
+                return;
+            }
+
+            showResult('specificResult', `🔍 Checking ${studentId}...`, 'info');
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/check-student-eligibility`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ studentId })
+                });
+
+                const data = await response.json();
+                
+                if (data.eligible) {
+                    showResult('specificResult', 
+                        `✅ Student Found!\n\n` +
+                        `👤 Name: ${data.studentName}\n` +
+                        `📧 Email: ${data.email || 'Not available'}\n` +
+                        `🏫 Department: ${data.department}\n` +
+                        `🔬 Lab: ${data.labId}\n\n` +
+                        `This student can use forgot password feature.`, 'success');
+                } else {
+                    showResult('specificResult', `❌ Student Not Found: ${data.reason}`, 'error');
+                }
+            } catch (error) {
+                showResult('specificResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testEmailSending() {
+            const studentId = document.getElementById('testStudentId').value.trim().toUpperCase();
+            const email = document.getElementById('testEmail').value.trim();
+            
+            if (!studentId || !email) {
+                showResult('emailResult', 'Please enter both Student ID and Email', 'error');
+                return;
+            }
+
+            showResult('emailResult', `📧 Sending test OTP to ${email}...`, 'info');
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/forgot-password-send-otp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ studentId, email })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('emailResult', 
+                        `✅ OTP Sent Successfully!\n\n` +
+                        `📧 Email: ${email}\n` +
+                        `👤 Student: ${studentId}\n\n` +
+                        `Check your email inbox (and spam folder) for the OTP.\n` +
+                        `Also check the server console for confirmation.`, 'success');
+                } else {
+                    showResult('emailResult', `❌ Failed: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('emailResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function clearAllStudents() {
+            if (!confirm('⚠️ Are you sure you want to delete ALL students?\n\nThis cannot be undone!')) {
+                return;
+            }
+
+            showResult('studentsResult', '🗑️ Clearing all students...', 'info');
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/restore-sample-data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clearOnly: true })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('studentsResult', '✅ All students cleared!', 'success');
+                } else {
+                    showResult('studentsResult', `❌ Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('studentsResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        function showResult(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        // Auto-load students on page load
+        window.addEventListener('load', loadAllStudents);
+    </script>
+</body>
+</html>

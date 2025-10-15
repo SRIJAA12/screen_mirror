@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Force Add TEST2025001</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f0f0f0; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+        button { padding: 15px 30px; margin: 10px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .result { margin: 20px 0; padding: 15px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 Emergency: Add TEST2025001</h1>
+        <p><strong>This will force-add your test student to the database.</strong></p>
+        
+        <button class="btn-danger" onclick="forceAddStudent()">🚨 FORCE ADD TEST2025001</button>
+        <button class="btn-primary" onclick="checkStudent()">🔍 Check if Added</button>
+        <button class="btn-success" onclick="testEligibility()">✅ Test Eligibility</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const SERVER_URL = 'http://10.10.194.103:8000';
+        
+        async function forceAddStudent() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '🚨 Force adding TEST2025001...';
+            
+            try {
+                // First, try to restore sample data
+                const response = await fetch(`${SERVER_URL}/api/restore-sample-data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ SUCCESS! Sample data restored.<br>
+                            📊 Students added: ${data.studentsAdded}<br>
+                            🎯 TEST2025001 should now be available!<br><br>
+                            <strong>Now try your sign-in system again!</strong>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ Error: ${error.message}<br><br>
+                        <strong>Try these steps:</strong><br>
+                        1. Make sure server is running<br>
+                        2. Check MongoDB is connected<br>
+                        3. Try refreshing this page
+                    </div>
+                `;
+            }
+        }
+        
+        async function checkStudent() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '🔍 Checking for TEST2025001...';
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/debug-students`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const testStudent = data.students.find(s => s.studentId === 'TEST2025001');
+                    
+                    if (testStudent) {
+                        resultDiv.innerHTML = `
+                            <div class="success">
+                                ✅ TEST2025001 EXISTS!<br>
+                                👤 Name: ${testStudent.name}<br>
+                                📧 Email: ${testStudent.email}<br>
+                                🏫 Department: ${testStudent.department}<br>
+                                🔐 Password Set: ${testStudent.isPasswordSet ? 'Yes' : 'No'}
+                            </div>
+                        `;
+                    } else {
+                        resultDiv.innerHTML = `
+                            <div class="error">
+                                ❌ TEST2025001 NOT FOUND<br>
+                                📊 Found ${data.count} students, but TEST2025001 is not among them.<br>
+                                Click "FORCE ADD TEST2025001" to add it.
+                            </div>
+                        `;
+                    }
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error checking: ${error.message}</div>`;
+            }
+        }
+        
+        async function testEligibility() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '✅ Testing TEST2025001 eligibility...';
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/check-student-eligibility`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ studentId: 'TEST2025001' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.eligible) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            🎉 PERFECT! TEST2025001 is eligible!<br>
+                            👤 Name: ${data.studentName}<br>
+                            🏫 Department: ${data.department}<br>
+                            🔬 Lab: ${data.labId}<br><br>
+                            <strong>✅ Your sign-in system should work now!</strong><br>
+                            Go to: <a href="${SERVER_URL}/student-signin/" target="_blank">Sign-in System</a>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            ❌ Not eligible: ${data.reason}<br>
+                            Try clicking "FORCE ADD TEST2025001" first.
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        // Auto-check on load
+        window.addEventListener('load', checkStudent);
+    </script>
+</body>
+</html>

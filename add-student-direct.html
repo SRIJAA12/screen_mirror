@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Student Directly</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .result { margin: 20px 0; padding: 15px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Direct Student Management</h1>
+    
+    <button onclick="checkStudents()">📋 Check All Students</button>
+    <button onclick="addTestStudent()">➕ Add TEST2025001</button>
+    <button onclick="testEligibility()">🔍 Test Eligibility</button>
+    
+    <div id="result"></div>
+
+    <script>
+        const SERVER_URL = 'http://10.10.194.103:8000';
+        
+        async function checkStudents() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '🔄 Checking students...';
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/debug-students`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h3>📊 Students in Database (${data.count}):</h3>
+                            ${data.students.map(s => `
+                                <div>• ${s.studentId} - ${s.name} (${s.email}) - Password Set: ${s.isPasswordSet}</div>
+                            `).join('')}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function addTestStudent() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '➕ Adding TEST2025001...';
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/restore-sample-data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ Sample data restored!<br>
+                            📊 Students added: ${data.studentsAdded}<br>
+                            🎯 TEST2025001 should now be available!
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function testEligibility() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '🔍 Testing TEST2025001 eligibility...';
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/check-student-eligibility`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ studentId: 'TEST2025001' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.eligible) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ TEST2025001 is eligible!<br>
+                            👤 Name: ${data.studentName}<br>
+                            🏫 Department: ${data.department}<br>
+                            🔬 Lab: ${data.labId}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Not eligible: ${data.reason}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

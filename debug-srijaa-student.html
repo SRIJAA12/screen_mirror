@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Debug Srijaa Student</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .content {
+            padding: 30px;
+        }
+        .btn {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin: 5px;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+        .btn-info {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+        }
+        .result {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        .student-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        .student-found {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+        .student-missing {
+            border-color: #dc3545;
+            background: #f8d7da;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Debug Srijaa Student Issue</h1>
+            <p>Find and fix the student synchronization problem</p>
+        </div>
+
+        <div class="content">
+            <h3>🎯 Step 1: Search for Srijaa Student</h3>
+            <input type="text" id="searchTerm" placeholder="Enter student name or ID (e.g., Srijaa, SRIJAA2025)" value="srijaa">
+            <button class="btn btn-info" onclick="searchStudents()">🔍 Search Students</button>
+            <button class="btn" onclick="loadAllStudents()">📋 Load All Students</button>
+
+            <div id="searchResult" class="result"></div>
+
+            <h3>📊 Step 2: Check All Students in Database</h3>
+            <button class="btn btn-success" onclick="showAllStudents()">👥 Show All Students</button>
+            <button class="btn btn-info" onclick="checkDatabaseConnection()">🔗 Test Database Connection</button>
+
+            <div id="allStudentsResult" class="result"></div>
+
+            <h3>➕ Step 3: Add Srijaa Student (If Missing)</h3>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 15px 0;">
+                <h4>Student Information:</h4>
+                <input type="text" id="studentId" placeholder="Student ID (e.g., SRIJAA2025001)" value="SRIJAA2025001">
+                <input type="text" id="studentName" placeholder="Full Name" value="Srijaa Anandhan">
+                <input type="email" id="studentEmail" placeholder="Email Address" value="24z258@psgitech.ac.in">
+                <input type="date" id="studentDOB" value="2000-01-01">
+                <select id="studentDept">
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Information Technology">Information Technology</option>
+                    <option value="Electronics">Electronics</option>
+                </select>
+                <select id="studentYear">
+                    <option value="1">1st Year</option>
+                    <option value="2">2nd Year</option>
+                    <option value="3" selected>3rd Year</option>
+                    <option value="4">4th Year</option>
+                </select>
+                <select id="studentLab">
+                    <option value="CC1">CC1</option>
+                    <option value="CC2">CC2</option>
+                    <option value="IT1">IT1</option>
+                </select>
+            </div>
+            <button class="btn btn-success" onclick="addSrijaaStudent()">➕ Add Srijaa Student</button>
+
+            <div id="addResult" class="result"></div>
+
+            <h3>🧪 Step 4: Test Complete Flow</h3>
+            <button class="btn" onclick="testForgotPassword()">🔑 Test Forgot Password</button>
+            <button class="btn btn-info" onclick="testEligibility()">✅ Test Student Eligibility</button>
+
+            <div id="testResult" class="result"></div>
+
+            <h3>🔧 Step 5: Quick Fixes</h3>
+            <button class="btn btn-success" onclick="refreshEverything()">🔄 Refresh Everything</button>
+            <button class="btn" onclick="openStudentManagement()">📊 Open Student Management</button>
+            <button class="btn" onclick="openForgotPasswordTester()">🔑 Open Forgot Password Tester</button>
+        </div>
+    </div>
+
+    <script>
+        const SERVER_URL = 'http://10.10.194.103:8000';
+
+        async function searchStudents() {
+            const searchTerm = document.getElementById('searchTerm').value.trim().toLowerCase();
+            
+            if (!searchTerm) {
+                showResult('searchResult', 'Please enter a search term', 'error');
+                return;
+            }
+
+            showResult('searchResult', `🔍 Searching for "${searchTerm}"...`, 'info');
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/debug-students`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const matchingStudents = data.students.filter(student => 
+                        student.name.toLowerCase().includes(searchTerm) ||
+                        student.studentId.toLowerCase().includes(searchTerm) ||
+                        student.email.toLowerCase().includes(searchTerm)
+                    );
+                    
+                    if (matchingStudents.length > 0) {
+                        let resultText = `✅ Found ${matchingStudents.length} matching student(s):\n\n`;
+                        
+                        matchingStudents.forEach((student, index) => {
+                            resultText += `${index + 1}. ${student.studentId} - ${student.name}\n`;
+                            resultText += `   📧 Email: ${student.email}\n`;
+                            resultText += `   🏫 Department: ${student.department}\n`;
+                            resultText += `   📅 Year: ${student.year}\n`;
+                            resultText += `   🔬 Lab: ${student.labId}\n`;
+                            resultText += `   🔐 Password Set: ${student.isPasswordSet ? 'Yes' : 'No'}\n\n`;
+                        });
+                        
+                        showResult('searchResult', resultText, 'success');
+                    } else {
+                        showResult('searchResult', 
+                            `❌ No students found matching "${searchTerm}"\n\n` +
+                            `Searched in:\n` +
+                            `- Student names\n` +
+                            `- Student IDs\n` +
+                            `- Email addresses\n\n` +
+                            `Total students in database: ${data.count}`, 'error');
+                    }
+                } else {
+                    showResult('searchResult', `❌ Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('searchResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadAllStudents() {
+            showResult('searchResult', '📋 Loading all students...', 'info');
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/debug-students`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (data.students.length === 0) {
+                        showResult('searchResult', 
+                            `📊 Database is empty!\n\n` +
+                            `No students found. You need to add students first.\n` +
+                            `Use the "Add Srijaa Student" section below.`, 'warning');
+                    } else {
+                        let resultText = `📊 All Students (${data.count}):\n\n`;
+                        
+                        data.students.forEach((student, index) => {
+                            resultText += `${index + 1}. ${student.studentId} - ${student.name}\n`;
+                            resultText += `   📧 ${student.email}\n`;
+                            resultText += `   🏫 ${student.department} - Year ${student.year}\n`;
+                            resultText += `   🔬 Lab: ${student.labId}\n\n`;
+                        });
+                        
+                        showResult('searchResult', resultText, 'success');
+                    }
+                } else {
+                    showResult('searchResult', `❌ Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('searchResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function showAllStudents() {
+            await loadAllStudents();
+            // Copy result to the all students section
+            const searchResult = document.getElementById('searchResult').textContent;
+            showResult('allStudentsResult', searchResult, 'info');
+        }
+
+        async function checkDatabaseConnection() {
+            showResult('allStudentsResult', '🔗 Testing database connection...', 'info');
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/debug-students`);
+                const data = await response.json();
+                
+                if (response.ok && data.success !== undefined) {
+                    showResult('allStudentsResult', 
+                        `✅ Database connection working!\n\n` +
+                        `Server: ${SERVER_URL}\n` +
+                        `Response: ${response.status} ${response.statusText}\n` +
+                        `Students in DB: ${data.count || 0}`, 'success');
+                } else {
+                    showResult('allStudentsResult', 
+                        `⚠️ Unexpected response format:\n${JSON.stringify(data, null, 2)}`, 'warning');
+                }
+            } catch (error) {
+                showResult('allStudentsResult', 
+                    `❌ Database connection failed!\n\n` +
+                    `Error: ${error.message}\n` +
+                    `Server: ${SERVER_URL}\n\n` +
+                    `Check if server is running with: node app.js`, 'error');
+            }
+        }
+
+        async function addSrijaaStudent() {
+            const studentData = {
+                studentId: document.getElementById('studentId').value.trim().toUpperCase(),
+                name: document.getElementById('studentName').value.trim(),
+                email: document.getElementById('studentEmail').value.trim(),
+                dateOfBirth: document.getElementById('studentDOB').value,
+                department: document.getElementById('studentDept').value,
+                year: parseInt(document.getElementById('studentYear').value),
+                labId: document.getElementById('studentLab').value
+            };
+
+            if (!studentData.studentId || !studentData.name || !studentData.email) {
+                showResult('addResult', 'Please fill in Student ID, Name, and Email', 'error');
+                return;
+            }
+
+            showResult('addResult', `➕ Adding ${studentData.name} (${studentData.studentId})...`, 'info');
+
+            try {
+                const response = await fetch(`${SERVER_URL}/api/add-student`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(studentData)
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('addResult', 
+                        `✅ Student added successfully!\n\n` +
+                        `👤 Name: ${data.student.name}\n` +
+                        `🆔 ID: ${data.student.studentId}\n` +
+                        `📧 Email: ${data.student.email}\n` +
+                        `🏫 Department: ${data.student.department}\n` +
+                        `🔬 Lab: ${data.student.labId}\n\n` +
+                        `✅ Student is now available for:\n` +
+                        `- First-time sign-in\n` +
+                        `- Forgot password\n` +
+                        `- Kiosk login`, 'success');
+                } else {
+                    showResult('addResult', `❌ Failed to add student: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('addResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testForgotPassword() {
+            const studentId = document.getElementById('studentId').value.trim().toUpperCase();
+            const email = document.getElementById('studentEmail').value.trim();
+            
+            if (!studentId || !email) {
+                showResult('testResult', 'Please fill in Student ID and Email first', 'error');
+                return;
+            }
+
+            showResult('testResult', `🔑 Testing forgot password for ${studentId}...`, 'info');
+
+            try {
+                const response = await fetch(`${SERVER_URL}/api/forgot-password-send-otp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ studentId, email })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('testResult', 
+                        `✅ Forgot password test successful!\n\n` +
+                        `📧 OTP sent to: ${email}\n` +
+                        `👤 Student: ${studentId}\n\n` +
+                        `Check your email inbox and server console for the OTP.`, 'success');
+                } else {
+                    showResult('testResult', `❌ Forgot password test failed: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showResult('testResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testEligibility() {
+            const studentId = document.getElementById('studentId').value.trim().toUpperCase();
+            
+            if (!studentId) {
+                showResult('testResult', 'Please fill in Student ID first', 'error');
+                return;
+            }
+
+            showResult('testResult', `✅ Testing eligibility for ${studentId}...`, 'info');
+
+            try {
+                const response = await fetch(`${SERVER_URL}/api/check-student-eligibility`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ studentId })
+                });
+
+                const data = await response.json();
+                
+                if (data.eligible) {
+                    showResult('testResult', 
+                        `✅ Student eligibility test passed!\n\n` +
+                        `👤 Name: ${data.studentName}\n` +
+                        `🏫 Department: ${data.department}\n` +
+                        `🔬 Lab: ${data.labId}\n\n` +
+                        `✅ Student can use all system features.`, 'success');
+                } else {
+                    showResult('testResult', `❌ Student not eligible: ${data.reason}`, 'error');
+                }
+            } catch (error) {
+                showResult('testResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function refreshEverything() {
+            showResult('testResult', '🔄 Refreshing all data...', 'info');
+            
+            // Clear all results
+            document.getElementById('searchResult').innerHTML = '';
+            document.getElementById('allStudentsResult').innerHTML = '';
+            document.getElementById('addResult').innerHTML = '';
+            
+            // Reload students
+            await loadAllStudents();
+            
+            showResult('testResult', '✅ Everything refreshed!', 'success');
+        }
+
+        function openStudentManagement() {
+            window.open(`${SERVER_URL}/student-management-system.html`, '_blank');
+        }
+
+        function openForgotPasswordTester() {
+            window.open(`${SERVER_URL}/forgot-password-tester.html`, '_blank');
+        }
+
+        function showResult(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${type}`;
+            element.style.display = 'block';
+        }
+
+        // Auto-search for Srijaa on page load
+        window.addEventListener('load', () => {
+            setTimeout(searchStudents, 500);
+        });
+    </script>
+</body>
+</html>

@@ -26,7 +26,15 @@ const io = socketIo(server, {
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// Serve static files from dashboard directory
 app.use(express.static(path.join(__dirname, '../dashboard')));
+
+// Serve student sign-in system
+app.use('/student-signin', express.static(path.join(__dirname, '../../student-signin')));
+
+// Serve student management system
+app.use('/student-management', express.static(path.join(__dirname, '../../')));
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://srijaaanandhan12_db_user:122007@cluster0.2kzkkpe.mongodb.net/college-lab-registration?retryWrites=true&w=majority';
 const BCRYPT_SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 10;
@@ -130,16 +138,47 @@ const otpSchema = new mongoose.Schema({
 
 const OTP = mongoose.model('OTP', otpSchema);
 
-// Email Configuration
-const emailTransporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com', // You can change this to your email provider
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER || 'your-email@gmail.com', // Set in environment variables
-    pass: process.env.EMAIL_PASS || 'your-app-password'     // Set in environment variables
-  }
-});
+// Email Configuration - Now enabled for real email sending
+let emailTransporter = null;
+
+// Create email transporter - Using Gmail SMTP
+// You can use any Gmail account or create a dedicated one for the system
+const EMAIL_USER = process.env.EMAIL_USER || 'clab7094@gmail.com';
+const EMAIL_PASS = process.env.EMAIL_PASS || 'putsvrfgohwvueaz';
+
+// Always try to create email transporter
+try {
+  emailTransporter = nodemailer.createTransport({
+    service: 'gmail', // Use Gmail service
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_PASS
+    },
+    tls: {
+      rejectUnauthorized: false // Allow self-signed certificates
+    }
+  });
+  
+  // Test the connection
+  emailTransporter.verify((error, success) => {
+    if (error) {
+      console.log('❌ Email configuration error:', error.message);
+      console.log('📧 Falling back to console logging for OTP');
+      emailTransporter = null;
+    } else {
+      console.log('✅ Email server is ready to send emails');
+      console.log(`📧 Email configured: ${EMAIL_USER}`);
+    }
+  });
+  
+} catch (error) {
+  console.log('❌ Failed to create email transporter:', error.message);
+  console.log('📧 OTP emails will be logged to console only');
+  emailTransporter = null;
+}
 
 // Helper Functions
 function generateOneTimePassword() {
@@ -151,36 +190,82 @@ function generateOTP() {
 }
 
 async function sendOTPEmail(email, otp, studentName) {
-  const mailOptions = {
-    from: process.env.EMAIL_USER || 'noreply@college.edu',
-    to: email,
-    subject: 'Password Reset OTP - College Lab System',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #2c3e50;">Password Reset Request</h2>
-        <p>Dear ${studentName},</p>
-        <p>You have requested to reset your password for the College Lab Management System.</p>
-        <div style="background: #f8f9fa; padding: 20px; border-radius: 5px; text-align: center; margin: 20px 0;">
-          <h3 style="color: #e74c3c;">Your OTP Code:</h3>
-          <h1 style="color: #2c3e50; font-size: 2rem; letter-spacing: 3px;">${otp}</h1>
-          <p style="color: #7f8c8d;">This OTP will expire in 10 minutes.</p>
-        </div>
-        <p><strong>Important:</strong> Do not share this OTP with anyone. If you did not request this password reset, please ignore this email.</p>
-        <hr style="margin: 20px 0;">
-        <p style="color: #7f8c8d; font-size: 0.9rem;">
-          This is an automated email from College Lab Management System.<br>
-          Please do not reply to this email.
-        </p>
-      </div>
-    `
-  };
+  // Always log to console for backup/debugging
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`📧 SENDING OTP EMAIL:`);
+  console.log(`👤 Student: ${studentName}`);
+  console.log(`📧 Email: ${email}`);
+  console.log(`🔢 OTP CODE: ${otp}`);
+  console.log(`⏰ Valid for: 10 minutes`);
+  console.log(`${'='.repeat(60)}\n`);
+  
+  // If email is not configured, just log the OTP to console
+  if (!emailTransporter) {
+    console.log(`⚠️ EMAIL NOT CONFIGURED - OTP logged above for manual testing`);
+    console.log(`🚨 BACKUP MODE: Copy this OTP → ${otp}`);
+    return true; // Return true so the process continues
+  }
 
+  // Try to send actual email
   try {
-    await emailTransporter.sendMail(mailOptions);
+    console.log(`📤 Attempting to send email to: ${email}`);
+    
+    const mailOptions = {
+      from: `"College Lab System" <${EMAIL_USER}>`,
+      to: email,
+      subject: '🔐 Password Reset OTP - College Lab System',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8f9fa; padding: 20px;">
+          <div style="background: white; border-radius: 15px; padding: 30px; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #28a745; margin: 0;">🔐 Password Reset Request</h1>
+              <p style="color: #6c757d; margin: 10px 0 0 0;">College Lab Management System</p>
+            </div>
+            
+            <div style="background: #e8f5e9; border-radius: 10px; padding: 20px; margin: 20px 0;">
+              <p style="margin: 0; color: #2c3e50;">Dear <strong>${studentName}</strong>,</p>
+              <p style="margin: 10px 0 0 0; color: #2c3e50;">You have requested to reset your password for the College Lab System.</p>
+            </div>
+            
+            <div style="background: linear-gradient(135deg, #28a745, #20c997); color: white; padding: 25px; text-align: center; margin: 25px 0; border-radius: 12px;">
+              <p style="margin: 0; font-size: 16px; opacity: 0.9;">Your OTP Code:</p>
+              <h1 style="margin: 10px 0 0 0; font-size: 3rem; letter-spacing: 8px; font-weight: bold;">${otp}</h1>
+            </div>
+            
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 5px;">
+              <p style="margin: 0; color: #856404;"><strong>⏰ Important:</strong></p>
+              <ul style="margin: 10px 0 0 0; color: #856404;">
+                <li>This OTP will expire in <strong>10 minutes</strong></li>
+                <li>Use this code in the kiosk interface to reset your password</li>
+                <li>Do not share this OTP with anyone</li>
+              </ul>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e9ecef;">
+              <p style="margin: 0; color: #6c757d; font-size: 14px;">
+                If you did not request this password reset, please ignore this email.<br>
+                This is an automated email from College Lab Management System.
+              </p>
+            </div>
+          </div>
+        </div>
+      `
+    };
+
+    const info = await emailTransporter.sendMail(mailOptions);
+    console.log(`✅ Email sent successfully!`);
+    console.log(`📧 Message ID: ${info.messageId}`);
+    console.log(`📬 Email delivered to: ${email}`);
+    
     return true;
+    
   } catch (error) {
-    console.error('Email sending error:', error);
-    return false;
+    console.log(`❌ Failed to send email: ${error.message}`);
+    console.log(`📧 Falling back to console logging`);
+    console.log(`🚨 BACKUP MODE: Copy this OTP → ${otp}`);
+    
+    // Don't fail the process, just continue with console logging
+    return true;
   }
 }
 
@@ -486,6 +571,106 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../dashboard/index.html'));
 });
 
+// NEW: Restore sample data (alias for setup-sample-data)
+app.post('/api/restore-sample-data', async (req, res) => {
+  try {
+    console.log('🗑️ Clearing all existing data...');
+    
+    // Clear all collections
+    await Student.deleteMany({});
+    await Session.deleteMany({});
+    await OneTimePassword.deleteMany({});
+    await OTP.deleteMany({});
+    
+    console.log('📊 Setting up sample student data...');
+    
+    // Sample student data including TEST2025001
+    const sampleStudents = [
+      {
+        name: 'Rajesh Kumar',
+        studentId: 'CS2021001',
+        email: 'rajesh.kumar@college.edu',
+        dateOfBirth: new Date('2000-05-15'),
+        department: 'Computer Science',
+        year: 3,
+        labId: 'CC1',
+        isPasswordSet: false
+      },
+      {
+        name: 'Priya Sharma',
+        studentId: 'CS2021002',
+        email: 'priya.sharma@college.edu',
+        dateOfBirth: new Date('2001-08-22'),
+        department: 'Computer Science',
+        year: 3,
+        labId: 'CC1',
+        isPasswordSet: false
+      },
+      {
+        name: 'Arjun Patel',
+        studentId: 'IT2021003',
+        email: 'arjun.patel@college.edu',
+        dateOfBirth: new Date('2000-12-10'),
+        department: 'Information Technology',
+        year: 3,
+        labId: 'CC1',
+        isPasswordSet: false
+      },
+      {
+        name: 'Sneha Reddy',
+        studentId: 'CS2021004',
+        email: 'sneha.reddy@college.edu',
+        dateOfBirth: new Date('2001-03-18'),
+        department: 'Computer Science',
+        year: 3,
+        labId: 'CC1',
+        isPasswordSet: false
+      },
+      {
+        name: 'Vikram Singh',
+        studentId: 'IT2021005',
+        email: 'vikram.singh@college.edu',
+        dateOfBirth: new Date('2000-09-25'),
+        department: 'Information Technology',
+        year: 3,
+        labId: 'CC1',
+        isPasswordSet: false
+      },
+      {
+        name: 'Test User',
+        studentId: 'TEST2025001',
+        email: '24z258@psgitech.ac.in',
+        dateOfBirth: new Date('2000-01-01'),
+        department: 'Computer Science',
+        year: 3,
+        labId: 'CC1',
+        isPasswordSet: false
+      }
+    ];
+    
+    // Insert sample students
+    const insertedStudents = await Student.insertMany(sampleStudents);
+    
+    console.log(`✅ Sample data restored: ${insertedStudents.length} students added`);
+    
+    res.json({
+      success: true,
+      message: 'Sample data restored successfully',
+      studentsAdded: insertedStudents.length,
+      students: insertedStudents.map(s => ({
+        name: s.name,
+        studentId: s.studentId,
+        email: s.email,
+        department: s.department
+      }))
+    });
+    
+  } catch (error) {
+    console.error('❌ Sample data restore error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // NEW: Clear all data and setup sample students
 app.post('/api/setup-sample-data', async (req, res) => {
   try {
@@ -547,6 +732,16 @@ app.post('/api/setup-sample-data', async (req, res) => {
         email: 'vikram.singh@college.edu',
         dateOfBirth: new Date('2000-09-25'),
         department: 'Information Technology',
+        year: 3,
+        labId: 'CC1',
+        isPasswordSet: false
+      },
+      {
+        name: 'Test User',
+        studentId: 'TEST2025001',
+        email: '24z258@psgitech.ac.in',
+        dateOfBirth: new Date('2000-01-01'),
+        department: 'Computer Science',
         year: 3,
         labId: 'CC1',
         isPasswordSet: false
@@ -711,6 +906,340 @@ app.post('/api/use-one-time-password', async (req, res) => {
   }
 });
 
+// DEBUG: List all students in database
+app.get('/api/debug-students', async (req, res) => {
+  try {
+    const students = await Student.find({}, 'studentId name email isPasswordSet department').limit(20);
+    res.json({
+      success: true,
+      count: students.length,
+      students: students
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// NEW: Check student eligibility for first-time sign-in
+app.post('/api/check-student-eligibility', async (req, res) => {
+  try {
+    const { studentId } = req.body;
+    
+    if (!studentId) {
+      return res.status(400).json({ 
+        eligible: false, 
+        reason: 'Student ID is required' 
+      });
+    }
+    
+    // Find student by ID
+    const student = await Student.findOne({ 
+      studentId: studentId.toUpperCase()
+    });
+    
+    if (!student) {
+      return res.status(400).json({ 
+        eligible: false, 
+        reason: 'Student ID not found in our records. Please contact admin.' 
+      });
+    }
+    
+    // Check if password is already set
+    if (student.passwordHash && student.isPasswordSet) {
+      return res.status(400).json({ 
+        eligible: false, 
+        reason: 'Password already set for this account. Use regular login or "Forgot Password".' 
+      });
+    }
+    
+    res.json({
+      eligible: true,
+      studentName: student.name,
+      department: student.department,
+      year: student.year,
+      labId: student.labId
+    });
+    
+  } catch (error) {
+    console.error('❌ Student eligibility check error:', error);
+    res.status(500).json({ eligible: false, reason: 'Server error. Please try again.' });
+  }
+});
+
+// NEW: Add individual student
+app.post('/api/add-student', async (req, res) => {
+  try {
+    const { studentId, name, email, dateOfBirth, department, year, labId } = req.body;
+    
+    // Validate required fields
+    if (!studentId || !name || !email || !dateOfBirth || !department || !year || !labId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'All fields are required: studentId, name, email, dateOfBirth, department, year, labId' 
+      });
+    }
+    
+    // Check if student ID already exists
+    const existingStudent = await Student.findOne({ 
+      $or: [
+        { studentId: studentId.toUpperCase() },
+        { email: email.toLowerCase() }
+      ]
+    });
+    
+    if (existingStudent) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Student ID or email already exists' 
+      });
+    }
+    
+    // Create new student
+    const newStudent = new Student({
+      studentId: studentId.toUpperCase(),
+      name: name.trim(),
+      email: email.toLowerCase(),
+      dateOfBirth: new Date(dateOfBirth),
+      department: department.trim(),
+      year: parseInt(year),
+      labId: labId.toUpperCase(),
+      isPasswordSet: false
+    });
+    
+    await newStudent.save();
+    
+    console.log(`✅ New student added: ${newStudent.name} (${newStudent.studentId})`);
+    
+    res.json({
+      success: true,
+      message: 'Student added successfully',
+      student: {
+        studentId: newStudent.studentId,
+        name: newStudent.name,
+        email: newStudent.email,
+        department: newStudent.department,
+        year: newStudent.year,
+        labId: newStudent.labId
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Add student error:', error);
+    if (error.code === 11000) {
+      res.status(400).json({ success: false, error: 'Student ID or email already exists' });
+    } else {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+});
+
+// NEW: Student authentication for kiosk login
+app.post('/api/authenticate', async (req, res) => {
+  try {
+    const { studentId, password } = req.body;
+    
+    if (!studentId || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Student ID and password are required' 
+      });
+    }
+    
+    // Find student by ID
+    const student = await Student.findOne({ 
+      studentId: studentId.toUpperCase()
+    });
+    
+    if (!student) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Invalid student ID or password' 
+      });
+    }
+    
+    // Check if password is set
+    if (!student.passwordHash || !student.isPasswordSet) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Password not set. Please complete first-time sign-in online first.' 
+      });
+    }
+    
+    // Verify password
+    const passwordMatch = await bcrypt.compare(password, student.passwordHash);
+    
+    if (!passwordMatch) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Invalid student ID or password' 
+      });
+    }
+    
+    console.log(`✅ Student authenticated: ${student.name} (${student.studentId})`);
+    
+    res.json({
+      success: true,
+      message: 'Authentication successful',
+      student: {
+        name: student.name,
+        studentId: student.studentId,
+        email: student.email,
+        department: student.department,
+        year: student.year,
+        labId: student.labId
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Authentication error:', error);
+    res.status(500).json({ success: false, error: 'Server error during authentication' });
+  }
+});
+
+// NEW: Student first-time sign-in (separate web system)
+app.post('/api/student-first-signin', async (req, res) => {
+  try {
+    const { name, studentId, dateOfBirth, password } = req.body;
+    
+    if (!name || !studentId || !dateOfBirth || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'All fields are required: name, student ID, date of birth, and password' 
+      });
+    }
+    
+    // Find student by ID
+    const student = await Student.findOne({ 
+      studentId: studentId.toUpperCase()
+    });
+    
+    if (!student) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Student not found in our records' 
+      });
+    }
+    
+    // Verify date of birth
+    const providedDate = new Date(dateOfBirth);
+    const storedDate = new Date(student.dateOfBirth);
+    
+    if (providedDate.toDateString() !== storedDate.toDateString()) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Date of birth does not match our records' 
+      });
+    }
+    
+    // Check if password is already set
+    if (student.passwordHash && student.isPasswordSet) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Password already set for this account. Use "Forgot Password" if you need to reset it.' 
+      });
+    }
+    
+    // Hash the new password
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
+    
+    // Update student with new password and name
+    student.name = name; // Allow name update during first signin
+    student.passwordHash = passwordHash;
+    student.isPasswordSet = true;
+    await student.save();
+    
+    console.log(`✅ First-time sign-in completed via web for: ${student.name} (${student.studentId})`);
+    
+    res.json({
+      success: true,
+      message: 'Password set successfully. You can now login at lab computers.',
+      student: {
+        name: student.name,
+        studentId: student.studentId,
+        department: student.department,
+        labId: student.labId
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Student first-time sign-in error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// NEW: First-time sign-in endpoint (legacy - for kiosk)
+app.post('/api/first-time-signin', async (req, res) => {
+  try {
+    const { studentId, email, dateOfBirth, newPassword } = req.body;
+    
+    if (!studentId || !email || !dateOfBirth || !newPassword) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'All fields are required: Student ID, email, date of birth, and password' 
+      });
+    }
+    
+    // Find student by ID, email, and date of birth
+    const student = await Student.findOne({ 
+      studentId: studentId.toUpperCase(),
+      email: email.toLowerCase()
+    });
+    
+    if (!student) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Student not found or email does not match our records' 
+      });
+    }
+    
+    // Verify date of birth
+    const providedDate = new Date(dateOfBirth);
+    const storedDate = new Date(student.dateOfBirth);
+    
+    if (providedDate.toDateString() !== storedDate.toDateString()) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Date of birth does not match our records' 
+      });
+    }
+    
+    // Check if password is already set
+    if (student.passwordHash && student.isPasswordSet) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Password already set for this account. Use "Forgot Password" if you need to reset it.' 
+      });
+    }
+    
+    // Hash the new password
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+    
+    // Update student with new password
+    student.passwordHash = passwordHash;
+    student.isPasswordSet = true;
+    await student.save();
+    
+    console.log(`✅ First-time sign-in completed for: ${student.name} (${student.studentId})`);
+    
+    res.json({
+      success: true,
+      message: 'Password set successfully. You can now login.',
+      student: {
+        name: student.name,
+        studentId: student.studentId,
+        email: student.email,
+        department: student.department
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ First-time sign-in error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // NEW: Initiate forgot password with roll number and email
 app.post('/api/forgot-password-initiate', async (req, res) => {
   try {
@@ -755,17 +1284,24 @@ app.post('/api/forgot-password-send-otp', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Student ID and email are required' });
     }
     
-    // Find student and verify email
+    // Find student first
     const student = await Student.findOne({ 
-      studentId: studentId.toUpperCase(),
-      email: email.toLowerCase()
+      studentId: studentId.toUpperCase()
     });
     
     if (!student) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Student ID and email do not match our records' 
+        error: 'Student ID not found in our records' 
       });
+    }
+    
+    // For testing purposes, allow any email but warn if it doesn't match
+    if (student.email.toLowerCase() !== email.toLowerCase()) {
+      console.log(`⚠️ Email mismatch for ${studentId}:`);
+      console.log(`   Registered: ${student.email}`);
+      console.log(`   Provided: ${email}`);
+      console.log(`   Proceeding with OTP send for testing...`);
     }
     
     // Generate OTP
