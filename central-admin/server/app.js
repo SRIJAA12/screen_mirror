@@ -2203,12 +2203,8 @@ app.post('/api/start-lab-session', async (req, res) => {
   try {
     const { subject, faculty, year, department, section, periods, startTime, expectedDuration } = req.body;
     
-    // FORCE CLEAR any existing active sessions before starting new one
-    console.log('🧹 Auto-clearing any existing active lab sessions...');
-    await LabSession.deleteMany({ status: 'active' });
-    await LabSession.deleteMany({}); // Clear all lab sessions to be safe
-    
-    console.log('✅ Cleared existing sessions, starting new session...');
+    // Only clear incomplete lab sessions, NOT student sessions
+    console.log('🧹 Cleaning up incomplete lab sessions only...');
     
     // Clean up any incomplete lab sessions that might cause validation issues
     await LabSession.deleteMany({ 
@@ -2218,6 +2214,14 @@ app.post('/api/start-lab-session', async (req, res) => {
         { periods: { $exists: false } }
       ]
     });
+    
+    // End any existing active lab sessions (but keep student sessions)
+    await LabSession.updateMany(
+      { status: 'active' },
+      { status: 'completed', endTime: new Date() }
+    );
+    
+    console.log('✅ Ready to start new lab session (student sessions preserved)...');
     
     // Create new lab session
     const newLabSession = new LabSession({
@@ -2235,7 +2239,10 @@ app.post('/api/start-lab-session', async (req, res) => {
     
     await newLabSession.save();
     
-    console.log(`🚀 Lab session started: ${subject} by ${faculty} - ${year}${year === 1 ? 'st' : year === 2 ? 'nd' : year === 3 ? 'rd' : 'th'} Year ${department} ${section !== 'None' ? 'Section ' + section : ''}`);
+    // Check how many student sessions are still active
+    const activeStudentSessions = await Session.countDocuments({ status: 'active' });
+    console.log(`🚀 Lab session started: ${subject} by ${faculty} - ${year}${year === 1 ? 'st' : year === 2 ? 'nd' : year === 3 ? 'rd' : 'th'} Year ${department} ${section !== 'None' ? 'Section ' + section : ''}`);    
+    console.log(`📊 Active student sessions preserved: ${activeStudentSessions}`);
     
     res.json({ 
       success: true, 
@@ -2304,6 +2311,13 @@ app.post('/api/end-lab-session', async (req, res) => {
     console.log(`🛑 Updated ${activeSessions.length} active sessions to completed`);
     
     console.log(`🛑 Lab session ended: ${labSession.subject}`);
+    
+    // Notify all admins that the lab session has ended
+    io.to('admins').emit('lab-session-ended', {
+      sessionId: labSession._id,
+      subject: labSession.subject,
+      clearedSessions: activeSessions.length
+    });
     
     res.json({ 
       success: true, 
@@ -2527,6 +2541,19 @@ io.on('connection', (socket) => {
     kioskSockets.set(sessionId, socket.id);
     socket.join(`session-${sessionId}`);
   });
+  
+  // Handle kiosk screen ready event
+  socket.on('kiosk-screen-ready', ({ sessionId, hasVideo, timestamp }) => {
+    console.log('🎉 KIOSK SCREEN READY:', sessionId, 'Has Video:', hasVideo);
+    // Notify all admins that this kiosk's screen is ready for monitoring
+    io.to('admins').emit('kiosk-screen-ready', { 
+      sessionId, 
+      hasVideo, 
+      timestamp,
+      kioskSocketId: socket.id
+    });
+    console.log('📡 Notified admins: Kiosk screen ready for session:', sessionId);
+  });
 
   socket.on('admin-offer', ({ offer, sessionId, adminSocketId }) => {
     const kioskSocketId = kioskSockets.get(sessionId);
@@ -2626,14 +2653,14 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 7104;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n${'='.repeat(60)}`);
   console.log(`🔐 College Lab Registration System`);
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`📡 Local Access: http://localhost:${PORT}`);
-  console.log(`🌐 Network Access: http://10.10.194.103:${PORT}`); // CURRENT IP
-  console.log(`📊 CSV/Excel Import: http://10.10.194.103:${PORT}/import.html`); // CURRENT IP
+  console.log(`🌐 Network Access: http://192.168.29.212:${PORT}`); // CURRENT IP
+  console.log(`📊 CSV/Excel Import: http://192.168.29.212:${PORT}/import.html`); // CURRENT IP
   console.log(`📚 Student Database: Import via CSV/Excel files (ExcelJS - Secure)`);
   console.log(`🔑 Password reset: Available via DOB verification`);
   console.log(`📊 API Endpoints: /api/import-students, /api/download-template, /api/stats`);

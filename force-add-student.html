@@ -91,7 +91,7 @@
             
             try {
                 // Use the existing restore sample data API but with custom data
-                const response = await fetch('http://10.10.194.103:8000/api/restore-sample-data', {
+                const response = await fetch('http://192.168.29.212:8000/api/restore-sample-data', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -125,7 +125,7 @@
             resultDiv.innerHTML = '📊 Adding all sample students...';
             
             try {
-                const response = await fetch('http://10.10.194.103:8000/api/restore-sample-data', {
+                const response = await fetch('http://192.168.29.212:8000/api/restore-sample-data', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -160,7 +160,7 @@
             
             try {
                 // Try the first-time signin API to see if student exists
-                const response = await fetch('http://10.10.194.103:8000/api/first-time-signin', {
+                const response = await fetch('http://192.168.29.212:8000/api/first-time-signin', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

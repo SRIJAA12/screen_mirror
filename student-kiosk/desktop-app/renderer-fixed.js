@@ -3,7 +3,7 @@ let socket = null;
 let pc = null;
 let sessionId = null;
 let localStream = null;
-const serverUrl = "http://192.168.29.212:7104";
+const serverUrl = "http://192.168.29.212:8000";
 
 console.log('🎬 FIXED Renderer.js loading...');
 
@@ -43,19 +43,6 @@ initializeSocket();
 window.electronAPI.onSessionCreated(async (data) => {
   sessionId = data.sessionId;
   console.log('✅ Session created event received:', { sessionId });
-  
-  // Clean up previous session resources
-  if (localStream) {
-    console.log('🧹 Cleaning up previous screen stream...');
-    localStream.getTracks().forEach(track => track.stop());
-    localStream = null;
-  }
-  
-  if (pc) {
-    console.log('🧹 Cleaning up previous peer connection...');
-    pc.close();
-    pc = null;
-  }
 
   // Wait for socket connection
   if (!socket || !socket.connected) {
@@ -67,7 +54,7 @@ window.electronAPI.onSessionCreated(async (data) => {
   console.log('📡 Registering kiosk for session:', sessionId);
   socket.emit('register-kiosk', { sessionId });
 
-  // Prepare screen capture (will emit screen-ready when done)
+  // Prepare screen capture
   await prepareScreenCapture();
 });
 
@@ -89,10 +76,10 @@ function waitForSocketConnection() {
   });
 }
 
-// Prepare screen capture with retry logic
-async function prepareScreenCapture(retryCount = 0) {
+// Prepare screen capture
+async function prepareScreenCapture() {
   try {
-    console.log(`🎥 Preparing screen capture... (Attempt ${retryCount + 1}/3)`);
+    console.log('🎥 Preparing screen capture...');
 
     const sources = await window.electronAPI.getScreenSources();
     
@@ -100,11 +87,8 @@ async function prepareScreenCapture(retryCount = 0) {
       throw new Error('No screen sources available');
     }
 
-    console.log(`📺 Found ${sources.length} screen sources:`);
-    sources.forEach((s, i) => console.log(`  ${i + 1}. ${s.name} (ID: ${s.id})`));
-
     const screenSource = sources.find(source => source.id.startsWith('screen')) || sources[0];
-    console.log('📺 Selected screen source:', screenSource.name, 'ID:', screenSource.id);
+    console.log('📺 Screen source obtained:', screenSource.name);
 
     localStream = await navigator.mediaDevices.getUserMedia({
       audio: false,
@@ -124,52 +108,10 @@ async function prepareScreenCapture(retryCount = 0) {
     console.log('✅ Screen stream obtained successfully');
     console.log('📊 Stream tracks:', localStream.getTracks().map(t => `${t.kind} (${t.label})`));
     console.log('✅ Ready for admin connections - waiting for offers...');
-    
-    // CRITICAL: Notify server that kiosk is NOW ready with screen capture
-    console.log('\n==============================================');
-    console.log('🎉 EMITTING KIOSK-SCREEN-READY EVENT');
-    console.log('Session ID:', sessionId);
-    console.log('Has Video:', true);
-    console.log('==============================================\n');
-    
-    socket.emit('kiosk-screen-ready', { 
-      sessionId, 
-      hasVideo: true,
-      timestamp: new Date().toISOString() 
-    });
-    
-    console.log('✅ Screen ready event emitted successfully');
 
   } catch (error) {
-    console.error(`❌ Error preparing screen capture (Attempt ${retryCount + 1}/3):`, error);
-    console.error('❌ Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
-    
-    // Retry up to 3 times with increasing delays
-    if (retryCount < 2) {
-      const delay = (retryCount + 1) * 2000; // 2s, 4s
-      console.log(`🔄 Retrying in ${delay/1000} seconds...`);
-      setTimeout(() => {
-        prepareScreenCapture(retryCount + 1);
-      }, delay);
-    } else {
-      console.error('❌❌❌ SCREEN CAPTURE FAILED AFTER 3 ATTEMPTS!');
-      console.error('❌ Possible causes:');
-      console.error('  1. Graphics driver issue - update your GPU drivers');
-      console.error('  2. Running in Remote Desktop - screen capture doesn\'t work in RDP');
-      console.error('  3. Multiple displays causing conflicts');
-      console.error('  4. Windows permissions - run as administrator');
-      alert('\u274c Screen capture failed after 3 attempts!\n\n' +
-            'Possible solutions:\n' +
-            '1. Update graphics drivers\n' +
-            '2. Don\'t use Remote Desktop\n' +
-            '3. Try disconnecting extra monitors\n' +
-            '4. Run as administrator\n\n' +
-            'Error: ' + error.message);
-    }
+    console.error('❌ Error preparing screen capture:', error);
+    alert('Screen sharing failed: ' + error.message);
   }
 }
 
@@ -178,10 +120,6 @@ async function handleAdminOffer({ offer, sessionId: adminSessionId, adminSocketI
   console.log('📥 KIOSK: Received admin offer for session:', adminSessionId);
   console.log('📥 KIOSK: Current sessionId:', sessionId);
   console.log('📥 KIOSK: localStream available:', !!localStream);
-  console.log('📥 KIOSK: Admin socket ID:', adminSocketId);
-  
-  // Send immediate acknowledgment
-  socket.emit('offer-received', { sessionId: adminSessionId, adminSocketId, timestamp: new Date().toISOString() });
   
   if (adminSessionId !== sessionId) {
     console.warn('⚠️ Session ID mismatch - admin:', adminSessionId, 'kiosk:', sessionId);
@@ -194,13 +132,6 @@ async function handleAdminOffer({ offer, sessionId: adminSessionId, adminSocketI
   }
 
   try {
-    // Close existing peer connection if any
-    if (pc) {
-      console.log('🗑️ Closing existing peer connection...');
-      pc.close();
-      pc = null;
-    }
-    
     // Create peer connection
     console.log('🔗 Creating peer connection for admin offer...');
     pc = new RTCPeerConnection({

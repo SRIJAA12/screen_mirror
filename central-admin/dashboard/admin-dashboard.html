@@ -395,21 +395,41 @@
         let currentLabSession = null;
         let sessionTimer = null;
         let sessionEndTime = null;
+        let sessionExported = false; // Track if CSV has been exported
+        let screenReadySessions = new Set(); // Track which kiosk screens are ready
+        let autoRefreshInterval = null; // Periodic refresh timer
 
         // Initialize socket connection
         function initializeSocket() {
             console.log('🚀 Admin dashboard loading...');
             
-            socket = io('http://10.10.194.103:8000');
+            socket = io('http://192.168.29.212:7104');
             
             socket.on('connect', () => {
                 console.log('✅ Admin dashboard connected:', socket.id);
                 socket.emit('register-admin');
                 loadActiveStudents();
+                
+                // Start automatic refresh every 3 seconds to detect new logins
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                }
+                autoRefreshInterval = setInterval(() => {
+                    console.log('🔄 Auto-refreshing sessions...');
+                    loadActiveStudents();
+                }, 3000);
+                console.log('✅ Auto-refresh started (every 3 seconds)');
             });
             
             socket.on('disconnect', () => {
                 console.log('❌ Admin dashboard disconnected');
+                
+                // Stop auto-refresh when disconnected
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                    console.log('🛑 Auto-refresh stopped');
+                }
             });
             
             socket.on('connect_error', (error) => {
@@ -426,12 +446,57 @@
             socket.on('session-ended', (sessionData) => {
                 console.log('📱 Session ended:', sessionData);
                 removeStudentFromGrid(sessionData.sessionId);
+                // Clear screen ready status for this session
+                screenReadySessions.delete(sessionData.sessionId);
+                console.log('🧹 Cleared screen ready status for:', sessionData.sessionId);
                 updateStats();
             });
             
             socket.on('active-sessions', (sessions) => {
                 console.log('📋 Active sessions received:', sessions);
                 displayActiveSessions(sessions);
+            });
+            
+            // Listen for lab session ended event
+            socket.on('lab-session-ended', (data) => {
+                console.log('🛑 Lab session ended:', data);
+                // Force refresh to clear all students
+                setTimeout(() => {
+                    loadActiveStudents();
+                }, 500);
+            });
+            
+            // Listen for kiosk screen ready event
+            socket.on('kiosk-screen-ready', (data) => {
+                console.log('\n==============================================');
+                console.log('🎉 ADMIN: KIOSK SCREEN READY EVENT RECEIVED');
+                console.log('Session ID:', data.sessionId);
+                console.log('Has Video:', data.hasVideo);
+                console.log('==============================================\n');
+                
+                screenReadySessions.add(data.sessionId);
+                
+                // Wait for grid element to be ready, then start monitoring immediately
+                const tryStartMonitoring = (attempt = 0) => {
+                    const videoContainer = document.getElementById(`video-${data.sessionId}`);
+                    
+                    if (videoContainer && connectedStudents.has(data.sessionId)) {
+                        if (!monitoringConnections.has(data.sessionId)) {
+                            console.log(`🎥 ⚡ IMMEDIATE START - Screen ready (attempt ${attempt + 1}):`, data.sessionId);
+                            startMonitoring(data.sessionId);
+                        } else {
+                            console.log('✅ Monitoring already active for:', data.sessionId);
+                        }
+                    } else if (attempt < 10) {
+                        // Video container not ready yet, wait 200ms and retry (up to 2 seconds)
+                        console.log(`⏳ Waiting for video container (attempt ${attempt + 1})...`);
+                        setTimeout(() => tryStartMonitoring(attempt + 1), 200);
+                    } else {
+                        console.error('❌ Video container never appeared for session:', data.sessionId);
+                    }
+                };
+                
+                tryStartMonitoring();
             });
             
             // WebRTC signaling
@@ -458,16 +523,44 @@
             const grid = document.getElementById('studentsGrid');
             
             if (!sessions || sessions.length === 0) {
-                grid.innerHTML = '<div class="no-students">📱 No students connected. Students need to login via kiosk first.</div>';
-                connectedStudents.clear();
+                // Only clear if we don't have any existing connections
+                if (connectedStudents.size === 0) {
+                    grid.innerHTML = '<div class="no-students">📱 No students connected. Students need to login via kiosk first.</div>';
+                }
                 updateStats();
                 return;
             }
             
+            // Don't rebuild grid if sessions haven't changed AND grid is not empty
+            const currentSessionIds = new Set(sessions.map(s => s._id || s.sessionId || s.id));
+            const existingSessionIds = new Set(connectedStudents.keys());
+            
+            // Check if sessions are the same
+            const sessionsChanged = currentSessionIds.size !== existingSessionIds.size ||
+                                   ![...currentSessionIds].every(id => existingSessionIds.has(id));
+            
+            // Check if grid has content
+            const gridHasStudents = grid.children.length > 0 && !grid.querySelector('.no-students');
+            
+            if (!sessionsChanged && gridHasStudents) {
+                console.log('✅ Sessions unchanged and grid populated, skipping rebuild');
+                updateStats();
+                return;
+            }
+            
+            if (!sessionsChanged && !gridHasStudents) {
+                console.log('🔄 Sessions unchanged but grid is EMPTY - rebuilding...');
+            } else if (sessionsChanged) {
+                console.log('🔄 Sessions changed, rebuilding grid...');
+            }
+            
+            // Preserve existing monitoring connections
+            const existingConnections = new Map(monitoringConnections);
+            
             grid.innerHTML = '';
             connectedStudents.clear();
             
-            console.log('🎥 AUTO-STARTING screen mirroring for all sessions...');
+            console.log('🎥 DISPLAYING sessions and preserving existing connections...');
             
             sessions.forEach(session => {
                 const sessionId = session._id || session.sessionId || session.id;
@@ -479,8 +572,45 @@
                     
                     // AUTO-START monitoring for this session
                     setTimeout(() => {
-                        console.log('🎥 AUTO-STARTING monitoring for session:', sessionId);
-                        startMonitoring(sessionId);
+                        // Check if we have an existing connection AND it's actually connected
+                        if (existingConnections.has(sessionId)) {
+                            const existingPC = existingConnections.get(sessionId);
+                            const isConnected = existingPC && 
+                                              (existingPC.connectionState === 'connected' || 
+                                               existingPC.iceConnectionState === 'connected');
+                            
+                            if (isConnected) {
+                                console.log('🔗 PRESERVING active connection for session:', sessionId);
+                                monitoringConnections.set(sessionId, existingPC);
+                                const videoContainer = document.getElementById(`video-${sessionId}`);
+                                if (videoContainer) {
+                                    const existingVideo = videoContainer.querySelector('video');
+                                    if (existingVideo && existingVideo.srcObject) {
+                                        console.log('✅ Video stream still active');
+                                    }
+                                }
+                            } else {
+                                console.log('❌ Existing connection FAILED - starting fresh for:', sessionId);
+                                // Close the failed connection
+                                if (existingPC) {
+                                    existingPC.close();
+                                }
+                                // Start fresh
+                                setTimeout(() => {
+                                    if (!monitoringConnections.has(sessionId)) {
+                                        startMonitoring(sessionId);
+                                    }
+                                }, 5000);
+                            }
+                        } else {
+                            // No existing connection - start fresh
+                            setTimeout(() => {
+                                if (!monitoringConnections.has(sessionId)) {
+                                    console.log('🎥 AUTO-STARTING fresh for:', sessionId);
+                                    startMonitoring(sessionId);
+                                }
+                            }, 5000);
+                        }
                     }, 1000); // Small delay to ensure DOM is ready
                 }
             });
@@ -523,8 +653,7 @@
                 </div>
                 <div class="student-actions">
                     <button onclick="expandVideo('${sessionId}')" class="btn-expand">🔍 Expand</button>
-                    <button onclick="stopMonitoring('${sessionId}')" class="btn-stop">🛑 Stop Watching</button>
-                    <div class="connection-status" id="status-${sessionId}">🔄 Connecting...</div>
+                    <div class="connection-status" id="status-${sessionId}">🔄 Auto-connecting...</div>
                 </div>
             `;
             
@@ -535,6 +664,17 @@
             grid.appendChild(studentCard);
             
             connectedStudents.set(sessionId, sessionData);
+            
+            // Try to start monitoring after a delay (kiosk should be ready by then)
+            console.log('⏳ Student added to grid, will auto-start monitoring in 5 seconds:', sessionId);
+            setTimeout(() => {
+                if (!monitoringConnections.has(sessionId)) {
+                    console.log('🎥 AUTO-STARTING monitoring after delay for:', sessionId);
+                    startMonitoring(sessionId);
+                } else {
+                    console.log('✅ Monitoring already started for:', sessionId);
+                }
+            }, 5000); // 5 second delay to ensure kiosk screen is ready
         }
 
         // Remove student from grid
@@ -927,6 +1067,7 @@
                 if (data.success) {
                     sessionActive = true;
                     currentLabSession = data.session;
+                    sessionExported = false; // Reset export flag for new session
                     document.getElementById('startSessionBtn').disabled = true;
                     document.getElementById('endSessionBtn').disabled = false;
                     
@@ -939,7 +1080,12 @@
                     // Start session timer
                     startSessionTimer();
                     
+                    // Preserve existing student connections - don't clear them
                     console.log('🚀 Lab session started with metadata:', data.session);
+                    console.log('🔗 Preserving existing student connections...');
+                    
+                    // Refresh student list without clearing existing connections
+                    loadActiveStudents();
                     alert(`✅ Lab session started successfully!\n\nSubject: ${data.session.subject}\nFaculty: ${data.session.faculty}\nDuration: ${periods} periods (${periods * 50} minutes)\n\nSession will end at: ${sessionEndTime.toLocaleTimeString()}`);
                 } else {
                     alert('❌ Failed to start session: ' + data.error);
@@ -1034,7 +1180,13 @@
                 return;
             }
 
-            if (confirm('⚠️ Are you sure you want to end the current lab session?\n\nThis will:\n• Stop all screen monitoring\n• Clear all session data\n• Prepare for the next session')) {
+            // Check if CSV has been exported
+            if (!sessionExported) {
+                alert('❌ Cannot End Session!\n\nYou must export the CSV file first before ending the session.\n\nClick "Export CSV" button to download session data, then try ending the session again.');
+                return;
+            }
+
+            if (confirm('⚠️ Are you sure you want to end the current lab session?\n\nThis will:\n• Stop all screen monitoring\n• Clear all session data\n• Prepare for the next session\n\n✓ CSV data has been exported')) {
                 // Send end session request to server
                 fetch('/api/end-lab-session', {
                     method: 'POST',
@@ -1182,7 +1334,8 @@
             window.URL.revokeObjectURL(url);
             
             console.log('✅ Session CSV exported successfully');
-            alert(`✅ Session data exported successfully!\n\nThe CSV includes ${studentRecords.length} students who logged in during this session.`);
+            sessionExported = true; // Mark as exported
+            alert(`✅ Session data exported successfully!\n\nThe CSV includes ${studentRecords.length} students who logged in during this session.\n\n✓ You can now end the session if needed.`);
         }
 
         // Debug session data
@@ -1260,7 +1413,24 @@ ${data.debug.labSessionStudentRecords?.map((s, i) =>
                     document.getElementById('session-info').style.display = 'none';
                     document.getElementById('startSessionBtn').disabled = false;
                     document.getElementById('endSessionBtn').disabled = true;
-                    refreshStudentList();
+                    
+                    // Clear all monitoring connections
+                    monitoringConnections.forEach((pc, sessionId) => {
+                        if (pc) {
+                            pc.close();
+                        }
+                    });
+                    monitoringConnections.clear();
+                    
+                    // Clear students grid immediately
+                    document.getElementById('studentsGrid').innerHTML = '<div class="no-students">📱 No students connected. Students need to login via kiosk first.</div>';
+                    connectedStudents.clear();
+                    updateStats();
+                    
+                    // Then refresh to get any remaining active sessions
+                    setTimeout(() => {
+                        refreshStudentList();
+                    }, 500);
                 } else {
                     alert('❌ Failed to clear sessions: ' + data.error);
                 }

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🎥 Simple Screen Mirror Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f0f0; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+        .video-container { width: 100%; height: 400px; background: #000; border-radius: 8px; margin: 20px 0; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Simple Screen Mirror Test</h1>
+        <div id="status" class="status info">Ready to test screen mirroring...</div>
+        
+        <div>
+            <button class="btn-primary" onclick="connectToServer()">🔌 Connect to Server</button>
+            <button class="btn-primary" onclick="startMonitoring()">📹 Start Monitoring</button>
+            <button class="btn-danger" onclick="stopMonitoring()">⏹️ Stop</button>
+        </div>
+        
+        <div class="video-container">
+            <video id="remoteVideo" autoplay muted></video>
+        </div>
+        
+        <div id="logs" style="background: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto;"></div>
+    </div>
+
+    <script src="http://192.168.29.212:8000/socket.io/socket.io.js"></script>
+    <script>
+        let socket = null;
+        let pc = null;
+        const serverUrl = 'http://192.168.29.212:8000';
+        
+        function log(message) {
+            const logs = document.getElementById('logs');
+            const time = new Date().toLocaleTimeString();
+            logs.innerHTML += `[${time}] ${message}<br>`;
+            logs.scrollTop = logs.scrollHeight;
+            console.log(message);
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.className = `status ${type}`;
+            status.textContent = message;
+            log(`STATUS: ${message}`);
+        }
+        
+        function connectToServer() {
+            updateStatus('🔌 Connecting to server...', 'info');
+            
+            socket = io(serverUrl);
+            
+            socket.on('connect', () => {
+                updateStatus('✅ Connected to server', 'success');
+                log(`Socket connected: ${socket.id}`);
+                socket.emit('register-admin');
+            });
+            
+            socket.on('disconnect', () => {
+                updateStatus('❌ Disconnected from server', 'error');
+                log('Socket disconnected');
+            });
+            
+            socket.on('connect_error', (error) => {
+                updateStatus(`❌ Connection error: ${error.message}`, 'error');
+                log(`Connection error: ${error}`);
+            });
+            
+            socket.on('webrtc-answer', ({ answer, sessionId }) => {
+                log(`📹 WebRTC answer received for session: ${sessionId}`);
+                handleWebRTCAnswer(answer);
+            });
+            
+            socket.on('webrtc-ice-candidate', ({ candidate, sessionId }) => {
+                log(`🧊 ICE candidate received for session: ${sessionId}`);
+                handleICECandidate(candidate);
+            });
+            
+            socket.on('active-sessions', (sessions) => {
+                log(`📱 Active sessions: ${sessions ? sessions.length : 0}`);
+                if (sessions && sessions.length > 0) {
+                    sessions.forEach((session, i) => {
+                        log(`Session ${i}: ${session.studentName} (${session.sessionId || session._id})`);
+                    });
+                }
+            });
+        }
+        
+        function startMonitoring() {
+            if (!socket || !socket.connected) {
+                updateStatus('❌ Not connected to server', 'error');
+                return;
+            }
+            
+            updateStatus('📹 Starting monitoring...', 'info');
+            
+            // Get active sessions first
+            socket.emit('get-active-sessions');
+            
+            // Wait a bit then try to connect to first session
+            setTimeout(() => {
+                // For testing, we'll try to connect to any active session
+                // In real use, you'd specify the session ID
+                startWebRTCConnection('test-session');
+            }, 1000);
+        }
+        
+        async function startWebRTCConnection(sessionId) {
+            try {
+                log(`📹 Starting WebRTC for session: ${sessionId}`);
+                
+                // Create peer connection
+                pc = new RTCPeerConnection({
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                });
+                
+                // Handle remote stream
+                pc.ontrack = (event) => {
+                    log('📺 Received remote stream!');
+                    const video = document.getElementById('remoteVideo');
+                    video.srcObject = event.streams[0];
+                    updateStatus('✅ Screen mirroring active!', 'success');
+                };
+                
+                // Handle ICE candidates
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        log('🧊 Sending ICE candidate');
+                        socket.emit('webrtc-ice-candidate', {
+                            candidate: event.candidate,
+                            sessionId: sessionId
+                        });
+                    }
+                };
+                
+                // Handle connection state
+                pc.onconnectionstatechange = () => {
+                    log(`🔗 Connection state: ${pc.connectionState}`);
+                    if (pc.connectionState === 'connected') {
+                        updateStatus('✅ WebRTC connected!', 'success');
+                    } else if (pc.connectionState === 'failed') {
+                        updateStatus('❌ WebRTC connection failed', 'error');
+                    }
+                };
+                
+                // Create offer
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                log('📤 Sending WebRTC offer');
+                socket.emit('admin-offer', {
+                    offer: offer,
+                    sessionId: sessionId,
+                    adminSocketId: socket.id
+                });
+                
+            } catch (error) {
+                log(`❌ WebRTC error: ${error.message}`);
+                updateStatus(`❌ WebRTC failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function handleWebRTCAnswer(answer) {
+            try {
+                if (pc) {
+                    await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                    log('✅ WebRTC answer processed');
+                }
+            } catch (error) {
+                log(`❌ Error handling answer: ${error.message}`);
+            }
+        }
+        
+        async function handleICECandidate(candidate) {
+            try {
+                if (pc) {
+                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    log('✅ ICE candidate added');
+                }
+            } catch (error) {
+                log(`❌ Error handling ICE: ${error.message}`);
+            }
+        }
+        
+        function stopMonitoring() {
+            if (pc) {
+                pc.close();
+                pc = null;
+            }
+            const video = document.getElementById('remoteVideo');
+            video.srcObject = null;
+            updateStatus('⏹️ Monitoring stopped', 'info');
+            log('Monitoring stopped');
+        }
+        
+        // Auto-connect on load
+        window.onload = () => {
+            log('Page loaded - ready to test');
+        };
+    </script>
+</body>
+</html>

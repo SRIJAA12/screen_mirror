@@ -219,31 +219,21 @@
                         <label class="form-label fw-bold"><i class="fas fa-key"></i> Password</label>
                         <input type="password" class="form-control form-control-lg" id="password" placeholder="Enter your Password" required autocomplete="off" />
                     </div>
-                    <div class="mb-4">
-                        <label class="form-label fw-bold"><i class="fas fa-desktop"></i> System Number</label>
-                        <select class="form-select form-select-lg" id="systemNumber" required>
-                            <option value="">Select System Number</option>
-                            <option value="CC1-01">CC1-01</option>
-                            <option value="CC1-02">CC1-02</option>
-                            <option value="CC1-03">CC1-03</option>
-                            <option value="CC1-04">CC1-04</option>
-                            <option value="CC1-05">CC1-05</option>
-                            <option value="CC1-06">CC1-06</option>
-                            <option value="CC1-07">CC1-07</option>
-                            <option value="CC1-08">CC1-08</option>
-                            <option value="CC1-09">CC1-09</option>
-                            <option value="CC1-10">CC1-10</option>
-                            <option value="CC2-01">CC2-01</option>
-                            <option value="CC2-02">CC2-02</option>
-                            <option value="CC2-03">CC2-03</option>
-                            <option value="CC2-04">CC2-04</option>
-                            <option value="CC2-05">CC2-05</option>
-                            <option value="CC2-06">CC2-06</option>
-                            <option value="CC2-07">CC2-07</option>
-                            <option value="CC2-08">CC2-08</option>
-                            <option value="CC2-09">CC2-09</option>
-                            <option value="CC2-10">CC2-10</option>
-                        </select>
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold"><i class="fas fa-building"></i> Lab Name</label>
+                            <select class="form-select form-select-lg" id="labName" required onchange="updateSystemNumber()">
+                                <option value="">Select Lab</option>
+                                <option value="CC1">CC1 - Computer Center 1</option>
+                                <option value="CC2">CC2 - Computer Center 2</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold"><i class="fas fa-desktop"></i> System Number</label>
+                            <select class="form-select form-select-lg" id="systemNumber" required disabled>
+                                <option value="">Select Lab First</option>
+                            </select>
+                        </div>
                     </div>
                     <button type="submit" class="btn btn-unlock btn-lg">
                         <i class="fas fa-unlock"></i> Unlock & Start Session
@@ -258,7 +248,7 @@
                     <div class="alert alert-info mt-2">
                         <i class="fas fa-info-circle"></i>
                         <strong>First-time Sign-in:</strong> 
-                        <a href="http://10.10.194.103:8000/student-signin/" target="_blank" class="alert-link">
+                        <a href="http://192.168.29.212:7104/student-signin/" target="_blank" class="alert-link">
                             Complete setup online first
                         </a>
                     </div>
@@ -653,7 +643,7 @@ Contact your lab administrator for assistance.`);
 
         async function initiateForgotPassword(studentId) {
             try {
-                const response = await fetch('http://10.10.194.103:8000/api/forgot-password-initiate', {
+                const response = await fetch('http://192.168.29.212:7104/api/forgot-password-initiate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ studentId })
@@ -687,7 +677,7 @@ Please check:
             try {
                 addDebugLog(`📧 Sending OTP to email: ${email}`);
                 
-                const response = await fetch('http://10.10.194.103:8000/api/forgot-password-send-otp', {
+                const response = await fetch('http://192.168.29.212:7104/api/forgot-password-send-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ studentId, email })
@@ -863,7 +853,7 @@ Please check:
             try {
                 addDebugLog(`🔄 Verifying OTP and resetting password for: ${studentId}`);
                 
-                const response = await fetch('http://10.10.194.103:8000/api/forgot-password-verify-otp', {
+                const response = await fetch('http://192.168.29.212:7104/api/forgot-password-verify-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -956,6 +946,33 @@ Please check:
                 }
             }, 500);
         });
+
+        // Update system number dropdown based on lab selection
+        function updateSystemNumber() {
+            const labName = document.getElementById('labName').value;
+            const systemSelect = document.getElementById('systemNumber');
+            
+            // Clear existing options
+            systemSelect.innerHTML = '';
+            
+            if (!labName) {
+                systemSelect.disabled = true;
+                systemSelect.innerHTML = '<option value="">Select Lab First</option>';
+                return;
+            }
+            
+            systemSelect.disabled = false;
+            systemSelect.innerHTML = '<option value="">Select System Number</option>';
+            
+            // Add options 1-69 for selected lab
+            for (let i = 1; i <= 69; i++) {
+                const systemNumber = `${labName}-${String(i).padStart(2, '0')}`;
+                const option = document.createElement('option');
+                option.value = systemNumber;
+                option.textContent = systemNumber;
+                systemSelect.appendChild(option);
+            }
+        }
 
     </script>
 </body>
