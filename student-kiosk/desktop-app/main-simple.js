@@ -5,12 +5,8 @@ const fs = require('fs');
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
-// Enable screen capturing
-app.commandLine.appendSwitch('enable-usermedia-screen-capturing');
-app.commandLine.appendSwitch('auto-select-desktop-capture-source', 'Entire screen');
-app.commandLine.appendSwitch('enable-features', 'MediaStream,GetDisplayMedia');
-app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
-app.commandLine.appendSwitch('disable-web-security');
+// Enable screen capturing - will be set when app is ready
+console.log('🎬 Kiosk application starting...');
 
 let mainWindow = null;
 let currentSession = null;
@@ -102,196 +98,213 @@ function createWindow() {
   });
 }
 
-// Handle screen sources request
-ipcMain.handle('get-screen-sources', async () => {
-  try {
-    const sources = await desktopCapturer.getSources({ 
-      types: ['screen', 'window'],
-      thumbnailSize: { width: 1920, height: 1080 }
-    });
-    console.log('✅ desktopCapturer returned', sources.length, 'sources');
-    return sources;
-  } catch (error) {
-    console.error('❌ desktopCapturer error:', error);
-    throw error;
-  }
-});
-
-// Handle student login
-ipcMain.handle('student-login', async (event, credentials) => {
-  try {
-    const creds = {
-      studentId: credentials.studentId,
-      password: credentials.password,
-      labId: LAB_ID,
-    };
-
-    console.log('🔐 Attempting authentication for:', creds.studentId);
-
-    const authRes = await fetch(`${SERVER_URL}/api/student-authenticate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(creds),
-    });
-    const authData = await authRes.json();
-
-    if (!authData.success) {
-      console.error('❌ Authentication failed:', authData.error);
-      return { success: false, error: authData.error || 'Authentication failed' };
-    }
-
-    console.log('✅ Authentication successful for:', authData.student.name);
-
-    const sessionRes = await fetch(`${SERVER_URL}/api/student-login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        studentName: authData.student.name,
-        studentId: authData.student.studentId,
-        computerName: os.hostname(),
-        labId: LAB_ID,
-        systemNumber: credentials.systemNumber || SYSTEM_NUMBER
-      }),
-    });
-    const sessionData = await sessionRes.json();
-
-    if (!sessionData.success) {
-      console.error('❌ Session creation failed:', sessionData.error);
-      return { success: false, error: sessionData.error || 'Session creation failed' };
-    }
-
-    console.log('✅ Session created:', sessionData.sessionId);
-
-    currentSession = { id: sessionData.sessionId, student: authData.student };
-    sessionActive = true;
-    isKioskLocked = false; // Unlock the system
-
-    // Update window properties after login (relaxed for debugging)
-    mainWindow.setClosable(true); // Allow close for debugging
-    mainWindow.setMinimizable(true); // Allow minimize
-    mainWindow.setAlwaysOnTop(false); // Allow other windows to come to front
-
-    console.log(`🔓 System unlocked for: ${authData.student.name} (${authData.student.studentId})`);
-
-    // Notify renderer to start screen streaming with delay
-    setTimeout(() => {
-      console.log('🎬 Sending session-created event to renderer:', sessionData.sessionId);
-      mainWindow.webContents.send('session-created', {
-        sessionId: sessionData.sessionId,
-        serverUrl: SERVER_URL
+function setupIPCHandlers() {
+  // Handle screen sources request
+  ipcMain.handle('get-screen-sources', async () => {
+    try {
+      const sources = await desktopCapturer.getSources({ 
+        types: ['screen', 'window'],
+        thumbnailSize: { width: 1920, height: 1080 }
       });
-    }, 1000);
+      console.log('✅ desktopCapturer returned', sources.length, 'sources');
+      return sources;
+    } catch (error) {
+      console.error('❌ desktopCapturer error:', error);
+      throw error;
+    }
+  });
 
-    return { 
-      success: true, 
-      student: authData.student, 
-      sessionId: sessionData.sessionId 
+  // Handle student login
+  ipcMain.handle('student-login', async (event, credentials) => {
+    try {
+      const creds = {
+        studentId: credentials.studentId,
+        password: credentials.password,
+        labId: LAB_ID,
+      };
+
+      console.log('🔐 Attempting authentication for:', creds.studentId);
+
+      const authRes = await fetch(`${SERVER_URL}/api/student-authenticate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(creds),
+      });
+      const authData = await authRes.json();
+
+      if (!authData.success) {
+        console.error('❌ Authentication failed:', authData.error);
+        return { success: false, error: authData.error || 'Authentication failed' };
+      }
+
+      console.log('✅ Authentication successful for:', authData.student.name);
+
+      const sessionRes = await fetch(`${SERVER_URL}/api/student-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentName: authData.student.name,
+          studentId: authData.student.studentId,
+          computerName: os.hostname(),
+          labId: LAB_ID,
+          systemNumber: credentials.systemNumber || SYSTEM_NUMBER
+        }),
+      });
+      const sessionData = await sessionRes.json();
+
+      if (!sessionData.success) {
+        console.error('❌ Session creation failed:', sessionData.error);
+        return { success: false, error: sessionData.error || 'Session creation failed' };
+      }
+
+      console.log('✅ Session created:', sessionData.sessionId);
+
+      currentSession = { id: sessionData.sessionId, student: authData.student };
+      sessionActive = true;
+      isKioskLocked = false; // Unlock the system
+
+      // Update window properties after login (relaxed for debugging)
+      mainWindow.setClosable(true); // Allow close for debugging
+      mainWindow.setMinimizable(true); // Allow minimize
+      mainWindow.setAlwaysOnTop(false); // Allow other windows to come to front
+
+      console.log(`🔓 System unlocked for: ${authData.student.name} (${authData.student.studentId})`);
+
+      // Notify renderer to start screen streaming with delay
+      setTimeout(() => {
+        console.log('🎬 Sending session-created event to renderer:', sessionData.sessionId);
+        mainWindow.webContents.send('session-created', {
+          sessionId: sessionData.sessionId,
+          serverUrl: SERVER_URL
+        });
+      }, 1000);
+
+      return { 
+        success: true, 
+        student: authData.student, 
+        sessionId: sessionData.sessionId 
+      };
+    } catch (error) {
+      console.error('❌ Login error:', error);
+      return { success: false, error: error.message || 'Unknown error' };
+    }
+  });
+
+  // Handle student logout
+  ipcMain.handle('student-logout', async () => {
+    if (!sessionActive || !currentSession) {
+      return { success: false, error: 'No active session' };
+    }
+
+    try {
+      console.log('🚪 Logging out session:', currentSession.id);
+
+      mainWindow.webContents.send('stop-live-stream');
+
+      await fetch(`${SERVER_URL}/api/student-logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: currentSession.id }),
+      });
+
+      console.log('✅ Logout successful');
+
+      sessionActive = false;
+      currentSession = null;
+      isKioskLocked = true; // Lock the system again
+
+      // Restore properties (relaxed for debugging)
+      mainWindow.setClosable(true);
+      mainWindow.setMinimizable(true);
+      mainWindow.setAlwaysOnTop(false);
+      
+      mainWindow.restore();
+      mainWindow.focus();
+      
+      console.log('🔒 System locked after logout');
+
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+      return { success: false, error: error.message || 'Unknown error' };
+    }
+  });
+
+  // Get system information
+  ipcMain.handle('get-system-info', async () => {
+    return {
+      hostname: os.hostname(),
+      platform: os.platform(),
+      arch: os.arch(),
+      cpus: os.cpus(),
+      memory: os.totalmem()
     };
-  } catch (error) {
-    console.error('❌ Login error:', error);
-    return { success: false, error: error.message || 'Unknown error' };
-  }
+  });
+
+  // Get server URL
+  ipcMain.handle('get-server-url', async () => {
+    return SERVER_URL;
+  });
+
+  // Reset Password with Date of Birth verification
+  ipcMain.handle('reset-password', async (event, data) => {
+    try {
+      const response = await fetch(`${SERVER_URL}/api/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      return await response.json();
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // First-time signin
+  ipcMain.handle('first-time-signin', async (event, data) => {
+    try {
+      const response = await fetch(`${SERVER_URL}/api/student-first-signin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      return await response.json();
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Check student eligibility for first-time signin
+  ipcMain.handle('check-student-eligibility', async (event, data) => {
+    try {
+      const response = await fetch(`${SERVER_URL}/api/check-student-eligibility`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      return await response.json();
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+}
+
+// Enable screen capturing before app ready
+try {
+  app.commandLine.appendSwitch('enable-usermedia-screen-capturing');
+  app.commandLine.appendSwitch('auto-select-desktop-capture-source', 'Entire screen');
+  app.commandLine.appendSwitch('enable-features', 'MediaStream,GetDisplayMedia');
+  app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors');
+  app.commandLine.appendSwitch('disable-web-security');
+  console.log('✅ Screen capturing switches enabled');
+} catch (error) {
+  console.error('❌ Error setting command line switches:', error);
+}
+
+app.whenReady().then(() => {
+  setupIPCHandlers();
+  createWindow();
 });
-
-// Handle student logout
-ipcMain.handle('student-logout', async () => {
-  if (!sessionActive || !currentSession) {
-    return { success: false, error: 'No active session' };
-  }
-
-  try {
-    console.log('🚪 Logging out session:', currentSession.id);
-
-    mainWindow.webContents.send('stop-live-stream');
-
-    await fetch(`${SERVER_URL}/api/student-logout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: currentSession.id }),
-    });
-
-    console.log('✅ Logout successful');
-
-    sessionActive = false;
-    currentSession = null;
-    isKioskLocked = true; // Lock the system again
-
-    // Restore properties (relaxed for debugging)
-    mainWindow.setClosable(true);
-    mainWindow.setMinimizable(true);
-    mainWindow.setAlwaysOnTop(false);
-    
-    mainWindow.restore();
-    mainWindow.focus();
-    
-    console.log('🔒 System locked after logout');
-
-    return { success: true };
-  } catch (error) {
-    console.error('❌ Logout error:', error);
-    return { success: false, error: error.message || 'Unknown error' };
-  }
-});
-
-// Get system information
-ipcMain.handle('get-system-info', async () => {
-  return {
-    hostname: os.hostname(),
-    platform: os.platform(),
-    arch: os.arch(),
-    cpus: os.cpus(),
-    memory: os.totalmem()
-  };
-});
-
-// Get server URL
-ipcMain.handle('get-server-url', async () => {
-  return SERVER_URL;
-});
-
-// Reset Password with Date of Birth verification
-ipcMain.handle('reset-password', async (event, data) => {
-  try {
-    const response = await fetch(`${SERVER_URL}/api/reset-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return await response.json();
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-// First-time signin
-ipcMain.handle('first-time-signin', async (event, data) => {
-  try {
-    const response = await fetch(`${SERVER_URL}/api/student-first-signin`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return await response.json();
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-// Check student eligibility for first-time signin
-ipcMain.handle('check-student-eligibility', async (event, data) => {
-  try {
-    const response = await fetch(`${SERVER_URL}/api/check-student-eligibility`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return await response.json();
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-app.whenReady().then(createWindow);
 
 app.on('window-all-closed', (e) => {
   e.preventDefault();
