@@ -13,7 +13,7 @@ let currentSession = null;
 let sessionActive = false;
 
 // Server URL - updated to current network IP
-const SERVER_URL = 'http://192.168.29.212:7104';
+const SERVER_URL = 'http://10.10.46.182:8000';
 const LAB_ID = process.env.LAB_ID || "CC1";
 const SYSTEM_NUMBER = process.env.SYSTEM_NUMBER || `CC1-${String(Math.floor(Math.random() * 10) + 1).padStart(2, '0')}`;
 

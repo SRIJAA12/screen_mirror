@@ -17,6 +17,15 @@
             user-select: none;
             padding: 20px 0;
         }
+        
+        /* Allow text selection in inputs - CRITICAL FIX! */
+        input, textarea {
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            -moz-user-select: text !important;
+            -ms-user-select: text !important;
+            pointer-events: auto !important;
+        }
         .kiosk-container {
             min-height: 100vh;
             display: flex;
@@ -248,7 +257,7 @@
                     <div class="alert alert-info mt-2">
                         <i class="fas fa-info-circle"></i>
                         <strong>First-time Sign-in:</strong> 
-                        <a href="http://192.168.29.212:7104/student-signin/" target="_blank" class="alert-link">
+                        <a href="http://10.10.46.182:8000/student-signin/" target="_blank" class="alert-link">
                             Complete setup online first
                         </a>
                     </div>
@@ -471,6 +480,19 @@ Contact your lab administrator for assistance.`);
         }
 
         loadSystemInfo();
+        
+        // Make login inputs responsive to clicks
+        ['studentId', 'password', 'systemNumber'].forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                field.addEventListener('click', function() {
+                    this.focus();
+                });
+                field.addEventListener('focus', function() {
+                    this.select();
+                });
+            }
+        });
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -583,19 +605,69 @@ Contact your lab administrator for assistance.`);
         function showForgotPasswordStep1() {
             // Create modal dialog for student ID input
             const modal = document.createElement('div');
-            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+            modal.id = 'studentIdModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;pointer-events:auto;';
             modal.innerHTML = `
-                <div style="background:white;padding:30px;border-radius:15px;max-width:400px;width:90%;">
+                <div style="background:white;padding:30px;border-radius:15px;max-width:400px;width:90%;position:relative;z-index:10000;pointer-events:auto;">
                     <h4>🆔 Enter Student ID</h4>
-                    <input type="text" id="fpStudentId" placeholder="Student ID (e.g., IT2021005)" style="width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:5px;">
+                    <input type="text" id="fpStudentId" placeholder="Student ID (e.g., IT2021005)" autofocus autocomplete="off" style="width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:5px;position:relative;z-index:10001;pointer-events:auto;user-select:text;-webkit-user-select:text;">
                     <div style="display:flex;gap:10px;margin-top:20px;">
-                        <button onclick="document.body.removeChild(this.closest('div').parentElement)" style="flex:1;padding:10px;background:#6c757d;color:white;border:none;border-radius:5px;">Cancel</button>
-                        <button onclick="submitStudentId()" style="flex:1;padding:10px;background:#007bff;color:white;border:none;border-radius:5px;">Next</button>
+                        <button id="fpSIDCancelBtn" style="flex:1;padding:10px;background:#6c757d;color:white;border:none;border-radius:5px;cursor:pointer;position:relative;z-index:10001;pointer-events:auto;">Cancel</button>
+                        <button id="fpSIDNextBtn" style="flex:1;padding:10px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;position:relative;z-index:10001;pointer-events:auto;">Next</button>
                     </div>
                 </div>
             `;
             document.body.appendChild(modal);
-            document.getElementById('fpStudentId').focus();
+            // Aggressive focus with multiple attempts
+            const activateInput = () => {
+                const input = document.getElementById('fpStudentId');
+                if (input) {
+                    input.focus();
+                    input.click();
+                    input.select();
+                    // Force input to be editable
+                    input.removeAttribute('readonly');
+                    input.removeAttribute('disabled');
+                }
+            };
+            
+            // Try multiple times to ensure it works
+            setTimeout(activateInput, 50);
+            setTimeout(activateInput, 100);
+            setTimeout(activateInput, 200);
+            setTimeout(activateInput, 500);
+            
+            // Add button event listeners
+            setTimeout(() => {
+                const cancelBtn = document.getElementById('fpSIDCancelBtn');
+                const nextBtn = document.getElementById('fpSIDNextBtn');
+                const input = document.getElementById('fpStudentId');
+                
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', function() {
+                        console.log('Cancel button clicked');
+                        const modal = document.getElementById('studentIdModal');
+                        if (modal && modal.parentElement) {
+                            modal.parentElement.removeChild(modal);
+                        }
+                    });
+                }
+                
+                if (nextBtn) {
+                    nextBtn.addEventListener('click', function() {
+                        console.log('Next button clicked');
+                        submitStudentId();
+                    });
+                }
+                
+                if (input) {
+                    input.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') {
+                            submitStudentId();
+                        }
+                    });
+                }
+            }, 100);
         }
         
         function submitStudentId() {
@@ -609,21 +681,69 @@ Contact your lab administrator for assistance.`);
         
         function showEmailInput(studentId, studentName, maskedEmail) {
             const modal = document.createElement('div');
-            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+            modal.id = 'emailModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;pointer-events:auto;';
             modal.innerHTML = `
-                <div style="background:white;padding:30px;border-radius:15px;max-width:450px;width:90%;">
+                <div style="background:white;padding:30px;border-radius:15px;max-width:450px;width:90%;position:relative;z-index:10000;pointer-events:auto;">
                     <h4>📧 Enter Email Address</h4>
                     <p><strong>Student:</strong> ${studentName}<br>
                     <strong>Registered:</strong> ${maskedEmail}</p>
-                    <input type="email" id="fpEmail" placeholder="Enter your complete email address" style="width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:5px;">
+                    <input type="email" id="fpEmail" placeholder="Enter your complete email address" autofocus autocomplete="off" style="width:100%;padding:10px;margin:10px 0;border:1px solid #ddd;border-radius:5px;position:relative;z-index:10001;pointer-events:auto;user-select:text;-webkit-user-select:text;">
                     <div style="display:flex;gap:10px;margin-top:20px;">
-                        <button onclick="document.body.removeChild(this.closest('div').parentElement)" style="flex:1;padding:10px;background:#6c757d;color:white;border:none;border-radius:5px;">Cancel</button>
-                        <button onclick="submitEmail('${studentId}', '${studentName}')" style="flex:1;padding:10px;background:#007bff;color:white;border:none;border-radius:5px;">Send OTP</button>
+                        <button id="fpEmailCancelBtn" style="flex:1;padding:10px;background:#6c757d;color:white;border:none;border-radius:5px;cursor:pointer;position:relative;z-index:10001;pointer-events:auto;">Cancel</button>
+                        <button id="fpEmailSendBtn" style="flex:1;padding:10px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;position:relative;z-index:10001;pointer-events:auto;">Send OTP</button>
                     </div>
                 </div>
             `;
             document.body.appendChild(modal);
-            document.getElementById('fpEmail').focus();
+            // Aggressive focus with multiple attempts
+            const activateInput = () => {
+                const input = document.getElementById('fpEmail');
+                if (input) {
+                    input.focus();
+                    input.click();
+                    input.select();
+                    input.removeAttribute('readonly');
+                    input.removeAttribute('disabled');
+                }
+            };
+            
+            setTimeout(activateInput, 50);
+            setTimeout(activateInput, 100);
+            setTimeout(activateInput, 200);
+            setTimeout(activateInput, 500);
+            
+            // Add button event listeners
+            setTimeout(() => {
+                const cancelBtn = document.getElementById('fpEmailCancelBtn');
+                const sendBtn = document.getElementById('fpEmailSendBtn');
+                const input = document.getElementById('fpEmail');
+                
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', function() {
+                        console.log('Cancel button clicked');
+                        const modal = document.getElementById('emailModal');
+                        if (modal && modal.parentElement) {
+                            modal.parentElement.removeChild(modal);
+                        }
+                    });
+                }
+                
+                if (sendBtn) {
+                    sendBtn.addEventListener('click', function() {
+                        console.log('Send OTP button clicked');
+                        submitEmail(studentId, studentName);
+                    });
+                }
+                
+                if (input) {
+                    input.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') {
+                            submitEmail(studentId, studentName);
+                        }
+                    });
+                }
+            }, 100);
         }
         
         function submitEmail(studentId, studentName) {
@@ -643,7 +763,7 @@ Contact your lab administrator for assistance.`);
 
         async function initiateForgotPassword(studentId) {
             try {
-                const response = await fetch('http://192.168.29.212:7104/api/forgot-password-initiate', {
+                const response = await fetch('http://10.10.46.182:8000/api/forgot-password-initiate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ studentId })
@@ -677,7 +797,7 @@ Please check:
             try {
                 addDebugLog(`📧 Sending OTP to email: ${email}`);
                 
-                const response = await fetch('http://192.168.29.212:7104/api/forgot-password-send-otp', {
+                const response = await fetch('http://10.10.46.182:8000/api/forgot-password-send-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ studentId, email })
@@ -692,14 +812,10 @@ Please check:
 
 Dear ${studentName},
 
-An OTP (One-Time Password) has been sent to:
+A 6-digit OTP (One-Time Password) has been sent to:
 ${email}
 
-🔍 TESTING MODE: Since email is not configured, 
-check the SERVER CONSOLE for the OTP code.
-
-The OTP will be displayed in the terminal where 
-you started the server (node app.js).
+Please check your email and enter the OTP in the next screen.
 
 Note: OTP will expire in 10 minutes.`);
                     
@@ -730,9 +846,10 @@ Please check:
         
         function showOTPInput(studentId, email, studentName) {
             const modal = document.createElement('div');
-            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;';
+            modal.id = 'otpModal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;pointer-events:auto;';
             modal.innerHTML = `
-                <div style="background:white;padding:30px;border-radius:15px;max-width:500px;width:90%;box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+                <div style="background:white;padding:30px;border-radius:15px;max-width:500px;width:90%;box-shadow:0 10px 30px rgba(0,0,0,0.3);position:relative;z-index:10000;pointer-events:auto;">
                     <h4 style="color:#28a745;margin-bottom:20px;">🔐 Enter OTP & New Password</h4>
                     <div style="background:#f8f9fa;padding:15px;border-radius:8px;margin-bottom:20px;">
                         <p style="margin:0;"><strong>Student:</strong> ${studentName}<br>
@@ -741,44 +858,40 @@ Please check:
                     
                     <div style="margin-bottom:15px;">
                         <label style="display:block;margin-bottom:5px;font-weight:bold;color:#333;">6-Digit OTP Code:</label>
-                        <input type="text" id="fpOTP" placeholder="000000" maxlength="6" 
-                               style="width:100%;padding:15px;font-size:18px;text-align:center;letter-spacing:3px;border:2px solid #28a745;border-radius:8px;background:#fff;"
+                        <input type="text" id="fpOTP" placeholder="000000" maxlength="6" autofocus
+                               style="width:100%;padding:15px;font-size:18px;text-align:center;letter-spacing:3px;border:2px solid #28a745;border-radius:8px;background:#fff;position:relative;z-index:10001;pointer-events:auto;user-select:text;-webkit-user-select:text;"
                                autocomplete="off" spellcheck="false">
-                        <small style="color:#666;display:block;margin-top:5px;">📧 Check your email or server console for the OTP code</small>
+                        <small style="color:#666;display:block;margin-top:5px;">📧 Check your email for the OTP code</small>
                     </div>
                     
                     <div style="margin-bottom:20px;">
                         <label style="display:block;margin-bottom:5px;font-weight:bold;color:#333;">New Password:</label>
                         <input type="password" id="fpNewPassword" placeholder="Enter new password (min 6 chars)" 
-                               style="width:100%;padding:15px;font-size:16px;border:2px solid #ddd;border-radius:8px;"
-                               onkeypress="if(event.key==='Enter'){submitOTPAndPassword('${studentId}', '${email}', '${studentName}')}">
+                               style="width:100%;padding:15px;font-size:16px;border:2px solid #ddd;border-radius:8px;position:relative;z-index:10001;pointer-events:auto;user-select:text;-webkit-user-select:text;">
                     </div>
                     
                     <div style="display:flex;gap:10px;margin-top:20px;">
-                        <button onclick="document.body.removeChild(this.closest('div').parentElement)" 
-                                style="flex:1;padding:15px;background:#6c757d;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer;">Cancel</button>
-                        <button onclick="submitOTPAndPassword('${studentId}', '${email}', '${studentName}')" 
-                                style="flex:1;padding:15px;background:#28a745;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer;">Reset Password</button>
-                    </div>
-                    
-                    <div style="margin-top:15px;padding:10px;background:#fff3cd;border-radius:5px;border-left:4px solid #ffc107;">
-                        <small style="color:#856404;">
-                            <strong>💡 Testing Mode:</strong> Check the server console for the OTP code since email is not configured.
-                        </small>
+                        <button id="fpCancelBtn" 
+                                style="flex:1;padding:15px;background:#6c757d;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer;position:relative;z-index:10001;pointer-events:auto;">Cancel</button>
+                        <button id="fpResetBtn" 
+                                style="flex:1;padding:15px;background:#28a745;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer;position:relative;z-index:10001;pointer-events:auto;">Reset Password</button>
                     </div>
                 </div>
             `;
             document.body.appendChild(modal);
             
-            // Enhanced focus and event handling for better responsiveness
-            setTimeout(() => {
+            // Aggressive focus with multiple attempts
+            const activateOTPInput = () => {
                 const otpInput = document.getElementById('fpOTP');
                 const passwordInput = document.getElementById('fpNewPassword');
                 
                 if (otpInput) {
                     // Force focus and make it responsive
                     otpInput.focus();
+                    otpInput.click();
                     otpInput.select();
+                    otpInput.removeAttribute('readonly');
+                    otpInput.removeAttribute('disabled');
                     
                     // Add better event handlers
                     otpInput.addEventListener('input', function(e) {
@@ -810,13 +923,60 @@ Please check:
                 
                 // Make password field more responsive
                 if (passwordInput) {
+                    // Handle click to ensure focus
+                    passwordInput.addEventListener('click', function() {
+                        this.focus();
+                    });
+                    
                     passwordInput.addEventListener('keypress', function(e) {
                         if (e.key === 'Enter') {
                             submitOTPAndPassword('${studentId}', '${email}', '${studentName}');
                         }
                     });
+                    
+                    passwordInput.removeAttribute('readonly');
+                    passwordInput.removeAttribute('disabled');
                 }
-            }, 200);
+            };
+            
+            // Try multiple times to ensure it works
+            setTimeout(activateOTPInput, 50);
+            setTimeout(activateOTPInput, 100);
+            setTimeout(activateOTPInput, 200);
+            setTimeout(activateOTPInput, 500);
+            
+            // Add button event listeners
+            setTimeout(() => {
+                const cancelBtn = document.getElementById('fpCancelBtn');
+                const resetBtn = document.getElementById('fpResetBtn');
+                
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', function() {
+                        console.log('Cancel button clicked');
+                        const modal = document.getElementById('otpModal');
+                        if (modal && modal.parentElement) {
+                            modal.parentElement.removeChild(modal);
+                        }
+                    });
+                }
+                
+                if (resetBtn) {
+                    resetBtn.addEventListener('click', function() {
+                        console.log('Reset button clicked');
+                        submitOTPAndPassword(studentId, email, studentName);
+                    });
+                }
+                
+                // Also allow Enter key on password field
+                const passwordInput = document.getElementById('fpNewPassword');
+                if (passwordInput) {
+                    passwordInput.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter') {
+                            submitOTPAndPassword(studentId, email, studentName);
+                        }
+                    });
+                }
+            }, 100);
         }
         
         function submitOTPAndPassword(studentId, email, studentName) {
@@ -853,7 +1013,7 @@ Please check:
             try {
                 addDebugLog(`🔄 Verifying OTP and resetting password for: ${studentId}`);
                 
-                const response = await fetch('http://192.168.29.212:7104/api/forgot-password-verify-otp', {
+                const response = await fetch('http://10.10.46.182:8000/api/forgot-password-verify-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -883,7 +1043,25 @@ Click OK to return to login.`);
                     
                     // Auto-fill the student ID in login form
                     document.getElementById('studentId').value = studentId;
-                    document.getElementById('password').focus();
+                    
+                    // Aggressive focus on password field with multiple attempts
+                    const activatePasswordField = () => {
+                        const passwordField = document.getElementById('password');
+                        if (passwordField) {
+                            passwordField.value = ''; // Clear any old value
+                            passwordField.focus();
+                            passwordField.click();
+                            passwordField.select();
+                            passwordField.removeAttribute('readonly');
+                            passwordField.removeAttribute('disabled');
+                        }
+                    };
+                    
+                    // Try multiple times
+                    setTimeout(activatePasswordField, 100);
+                    setTimeout(activatePasswordField, 200);
+                    setTimeout(activatePasswordField, 400);
+                    setTimeout(activatePasswordField, 800);
                     
                     addDebugLog(`Student ID auto-filled: ${studentId}`);
                     

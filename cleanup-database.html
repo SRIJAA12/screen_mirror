@@ -83,12 +83,14 @@
     </div>
 
     <script>
+        const SERVER_URL = 'http://10.10.46.182:8000';
+
         async function cleanupLabSessions() {
             const resultDiv = document.getElementById('labSessionResult');
             resultDiv.innerHTML = '🧹 Cleaning up problematic lab sessions...';
             
             try {
-                const response = await fetch('http://192.168.29.212:8000/api/cleanup-lab-sessions', {
+                const response = await fetch(`${SERVER_URL}/api/cleanup-lab-sessions`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -123,7 +125,7 @@
             
             try {
                 // This is a simple check - we'll just try to fetch active sessions
-                const response = await fetch('http://192.168.29.212:8000/api/active-sessions/all');
+                const response = await fetch(`${SERVER_URL}/api/active-sessions/all`);
                 const data = await response.json();
                 
                 resultDiv.innerHTML = `
@@ -149,7 +151,7 @@
             
             try {
                 // We'll use the end session API to clear any active sessions
-                const response = await fetch('http://192.168.29.212:8000/api/end-lab-session', {
+                const response = await fetch(`${SERVER_URL}/api/end-lab-session`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
