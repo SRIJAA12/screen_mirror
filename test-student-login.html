@@ -122,7 +122,7 @@
             };
             
             try {
-                const response = await fetch('http://10.10.46.182:8000/api/student-login', {
+                const response = await fetch('http://10.10.46.182:7401/api/student-login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -166,7 +166,7 @@
             }
             
             try {
-                const response = await fetch('http://10.10.46.182:8000/api/student-logout', {
+                const response = await fetch('http://10.10.46.182:7401/api/student-logout', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -203,7 +203,7 @@
 
         async function checkActiveSessions() {
             try {
-                const response = await fetch('http://10.10.46.182:8000/api/active-sessions/all');
+                const response = await fetch('http://10.10.46.182:7401/api/active-sessions/all');
                 const data = await response.json();
                 
                 document.getElementById('sessionInfo').innerHTML = `

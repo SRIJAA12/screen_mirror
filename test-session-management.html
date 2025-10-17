@@ -78,7 +78,7 @@
             resultDiv.innerHTML = 'Testing session start...';
             
             try {
-                const response = await fetch('http://10.10.46.182:8000/api/start-lab-session', {
+                const response = await fetch('http://10.10.46.182:7401/api/start-lab-session', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -122,7 +122,7 @@
             resultDiv.innerHTML = 'Testing session export...';
             
             try {
-                const response = await fetch(`http://10.10.46.182:8000/api/export-session-data/${testSessionId}`);
+                const response = await fetch(`http://10.10.46.182:7401/api/export-session-data/${testSessionId}`);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -152,7 +152,7 @@
             resultDiv.innerHTML = 'Testing session end...';
             
             try {
-                const response = await fetch('http://10.10.46.182:8000/api/end-lab-session', {
+                const response = await fetch('http://10.10.46.182:7401/api/end-lab-session', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -179,7 +179,7 @@
             
             try {
                 // Check for active lab sessions
-                const response = await fetch('http://10.10.46.182:8000/api/active-sessions/all');
+                const response = await fetch('http://10.10.46.182:7401/api/active-sessions/all');
                 const data = await response.json();
                 
                 resultDiv.innerHTML = `

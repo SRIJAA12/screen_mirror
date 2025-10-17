@@ -162,7 +162,7 @@
             resultDiv.innerHTML = '📊 Testing export data...';
             
             try {
-                const SERVER_URL = 'http://10.10.46.182:8000';
+                const SERVER_URL = 'http://10.10.46.182:7401';
                 // First get current session
                 const sessionResponse = await fetch(`${SERVER_URL}/api/debug-current-session`);
                 const sessionData = await sessionResponse.json();
@@ -175,7 +175,7 @@
                 const sessionId = sessionData.debug.activeLabSession._id;
                 
                 // Test export
-                const exportResponse = await fetch(`http://10.10.46.182:8000/api/export-session-data/${sessionId}`);
+                const exportResponse = await fetch(`http://10.10.46.182:7401/api/export-session-data/${sessionId}`);
                 const exportData = await exportResponse.json();
                 
                 if (exportData.success) {

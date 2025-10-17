@@ -112,7 +112,7 @@ http://192.168.29.212:8000/admin-dashboard.html
 **Solution:** Complete first-time sign-in via web system first
 
 ### **Sign-in system not loading**
-**Solution:** Ensure server is running and check `http://10.10.46.182:8000/student-signin/`
+**Solution:** Ensure server is running and check `http://10.10.46.182:7401/student-signin/`
 
 ### **Kiosk won't start**
 **Solution:** Check if port 8000 is available and server is running
@@ -156,11 +156,11 @@ http://192.168.29.212:8000/admin-dashboard.html
 
 ## 🔗 **Quick Access URLs**
 
-- **Complete Test Dashboard:** `http://10.10.46.182:8000/complete-test.html`
-- **Sign-in System:** `http://10.10.46.182:8000/student-signin/`
-- **Admin Dashboard:** `http://10.10.46.182:8000/admin-dashboard.html`
-- **Screen Monitor:** `http://10.10.46.182:8000/working-simple.html`
-- **Debug Students:** `http://10.10.46.182:8000/api/debug-students`
+- **Complete Test Dashboard:** `http://10.10.46.182:7401/complete-test.html`
+- **Sign-in System:** `http://10.10.46.182:7401/student-signin/`
+- **Admin Dashboard:** `http://10.10.46.182:7401/admin-dashboard.html`
+- **Screen Monitor:** `http://10.10.46.182:7401/working-simple.html`
+- **Debug Students:** `http://10.10.46.182:7401/api/debug-students`
 
 ---
 

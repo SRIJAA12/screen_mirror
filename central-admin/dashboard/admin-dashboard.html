@@ -403,7 +403,7 @@
         function initializeSocket() {
             console.log('🚀 Admin dashboard loading...');
             
-            socket = io('http://10.10.46.182:8000');
+            socket = io('http://10.10.46.182:7401');
             
             socket.on('connect', () => {
                 console.log('✅ Admin dashboard connected:', socket.id);
@@ -544,6 +544,18 @@
             
             if (!sessionsChanged && gridHasStudents) {
                 console.log('✅ Sessions unchanged and grid populated, skipping rebuild');
+                
+                // CRITICAL FIX: Even if grid unchanged, ensure monitoring is active for all sessions
+                setTimeout(() => {
+                    sessions.forEach(session => {
+                        const sessionId = session._id || session.sessionId || session.id;
+                        if (sessionId && !monitoringConnections.has(sessionId)) {
+                            console.log('🎥 Grid skipped but monitoring missing - starting for:', sessionId);
+                            startMonitoring(sessionId);
+                        }
+                    });
+                }, 1000);
+                
                 updateStats();
                 return;
             }
@@ -1086,6 +1098,20 @@
                     
                     // Refresh student list without clearing existing connections
                     loadActiveStudents();
+                    
+                    // CRITICAL FIX: Force start screen mirroring for all existing sessions
+                    console.log('🎥 FORCE-STARTING screen mirroring for all connected students...');
+                    setTimeout(() => {
+                        connectedStudents.forEach((sessionData, sessionId) => {
+                            if (!monitoringConnections.has(sessionId)) {
+                                console.log('🎥 Force-starting monitoring for:', sessionId);
+                                startMonitoring(sessionId);
+                            } else {
+                                console.log('✅ Monitoring already active for:', sessionId);
+                            }
+                        });
+                    }, 2000); // 2 second delay to ensure UI is ready
+                    
                     alert(`✅ Lab session started successfully!\n\nSubject: ${data.session.subject}\nFaculty: ${data.session.faculty}\nDuration: ${periods} periods (${periods * 50} minutes)\n\nSession will end at: ${sessionEndTime.toLocaleTimeString()}`);
                 } else {
                     alert('❌ Failed to start session: ' + data.error);

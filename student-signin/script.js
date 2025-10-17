@@ -4,7 +4,7 @@
 
 // Configuration
 const ADMIN_SERVER_IP = "10.10.46.182"; // ⬅️ YOUR CURRENT IP ADDRESS
-const SERVER_URL = `http://${ADMIN_SERVER_IP}:8000`;
+const SERVER_URL = `http://${ADMIN_SERVER_IP}:7401`;
 
 // DOM Elements
 const step1 = document.getElementById('step1');

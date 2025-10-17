@@ -257,7 +257,7 @@
                     <div class="alert alert-info mt-2">
                         <i class="fas fa-info-circle"></i>
                         <strong>First-time Sign-in:</strong> 
-                        <a href="http://10.10.46.182:8000/student-signin/" target="_blank" class="alert-link">
+                        <a href="http://10.10.46.182:7401/student-signin/" target="_blank" class="alert-link">
                             Complete setup online first
                         </a>
                     </div>
@@ -763,7 +763,7 @@ Contact your lab administrator for assistance.`);
 
         async function initiateForgotPassword(studentId) {
             try {
-                const response = await fetch('http://10.10.46.182:8000/api/forgot-password-initiate', {
+                const response = await fetch('http://10.10.46.182:7401/api/forgot-password-initiate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ studentId })
@@ -797,7 +797,7 @@ Please check:
             try {
                 addDebugLog(`📧 Sending OTP to email: ${email}`);
                 
-                const response = await fetch('http://10.10.46.182:8000/api/forgot-password-send-otp', {
+                const response = await fetch('http://10.10.46.182:7401/api/forgot-password-send-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ studentId, email })
@@ -1013,7 +1013,7 @@ Please check:
             try {
                 addDebugLog(`🔄 Verifying OTP and resetting password for: ${studentId}`);
                 
-                const response = await fetch('http://10.10.46.182:8000/api/forgot-password-verify-otp', {
+                const response = await fetch('http://10.10.46.182:7401/api/forgot-password-verify-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
