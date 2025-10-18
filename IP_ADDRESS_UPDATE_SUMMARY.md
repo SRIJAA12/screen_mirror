@@ -1,34 +1,34 @@
 # IP Address Update Summary
 
 ## 🔄 **IP Address Changed From → To**
-- **Old IP:** `192.168.29.212` / `10.10.194.103`
-- **New IP:** `10.10.46.182:7401` (Current network IP and port)
+- **Old IP:** `192.168.29.212` / `10.10.46.182`
+- **New IP:** `10.10.194.103:7401` (Current network IP and port)
 
 ## 📁 **Files Updated**
 
 ### **1. Student Kiosk Application**
 - ✅ `student-kiosk/desktop-app/renderer.js`
-  - Updated `serverUrl = "http://10.10.46.182:7401"`
+  - Updated `serverUrl = "http://10.10.194.103:7401"`
 - ✅ `student-kiosk/desktop-app/main-simple.js`
-  - Updated `SERVER_URL = 'http://10.10.46.182:7401'`
+  - Updated `SERVER_URL = 'http://10.10.194.103:7401'`
 
 ### **2. Central Admin Server**
 - ✅ `central-admin/server/app.js`
   - Updated network access URLs in console output
-  - `http://10.10.46.182:7401`
-  - `http://10.10.46.182:7401/import.html`
+  - `http://10.10.194.103:7401`
+  - `http://10.10.194.103:7401/import.html`
 
 ### **3. Admin Dashboard**
 - ✅ `central-admin/dashboard/admin-dashboard.html`
-  - Updated Socket.io connection: `io('http://10.10.46.182:7401')`
+  - Updated Socket.io connection: `io('http://10.10.194.103:7401')`
 - ✅ `central-admin/dashboard/working-simple.html`
-  - Updated Socket.io connection: `io('http://10.10.46.182:7401')`
+  - Updated Socket.io connection: `io('http://10.10.194.103:7401')`
 
 ### **4. Documentation Files**
 - ✅ `ENHANCED_SESSION_TESTING_V2.md`
-  - Updated admin dashboard URL: `http://10.10.46.182:7401/admin-dashboard.html`
+  - Updated admin dashboard URL: `http://10.10.194.103:7401/admin-dashboard.html`
 - ✅ `SESSION_FIXES_SUMMARY.md`
-  - Updated test URL: `http://10.10.46.182:7401/test-session-management.html`
+  - Updated test URL: `http://10.10.194.103:7401/test-session-management.html`
 
 ### **5. Test Files**
 - ✅ `test-session-management.html`
@@ -39,18 +39,18 @@
 ## 🌐 **New Access URLs**
 
 ### **Main Application URLs:**
-- **Admin Dashboard:** `http://10.10.46.182:7401/admin-dashboard.html`
-- **Working Simple Dashboard:** `http://10.10.46.182:7401/working-simple.html`
-- **Student Management:** `http://10.10.46.182:7401/student-management.html`
-- **CSV/Excel Import:** `http://10.10.46.182:7401/import.html`
+- **Admin Dashboard:** `http://10.10.194.103:7401/admin-dashboard.html`
+- **Working Simple Dashboard:** `http://10.10.194.103:7401/working-simple.html`
+- **Student Management:** `http://10.10.194.103:7401/student-management.html`
+- **CSV/Excel Import:** `http://10.10.194.103:7401/import.html`
 
 ### **Test URLs:**
-- **Session Management Test:** `http://10.10.46.182:7401/test-session-management.html`
-- **Student Login Test:** `http://10.10.46.182:7401/test-student-login.html`
-- **Sample Data Restore:** `http://10.10.46.182:7401/restore-sample-data.html`
+- **Session Management Test:** `http://10.10.194.103:7401/test-session-management.html`
+- **Student Login Test:** `http://10.10.194.103:7401/test-student-login.html`
+- **Sample Data Restore:** `http://10.10.194.103:7401/restore-sample-data.html`
 
 ### **API Endpoints:**
-All API endpoints now accessible at: `http://10.10.46.182:7401/api/...`
+All API endpoints now accessible at: `http://10.10.194.103:7401/api/...`
 
 ## ✅ **Verification Steps**
 
@@ -59,10 +59,10 @@ All API endpoints now accessible at: `http://10.10.46.182:7401/api/...`
    cd central-admin\server
    node app.js
    ```
-   - Check console shows new IP: `🌐 Network Access: http://10.10.46.182:7401`
+   - Check console shows new IP: `🌐 Network Access: http://10.10.194.103:7401`
 
 2. **Test admin dashboard:**
-   - Open: `http://10.10.46.182:7401/admin-dashboard.html`
+   - Open: `http://10.10.194.103:7401/admin-dashboard.html`
    - Verify Socket.io connection works
 
 3. **Test student kiosk:**

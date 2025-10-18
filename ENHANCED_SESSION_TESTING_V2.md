@@ -35,7 +35,7 @@ npm start
 ```
 
 ### Step 2: Test Enhanced Session Start
-1. Open admin dashboard: `http://10.10.46.182:7401/admin-dashboard.html`
+1. Open admin dashboard: `http://10.10.194.103:7401/admin-dashboard.html`
 2. Click "🚀 Start Lab Session"
 3. Fill in the enhanced dialog:
    - Subject: "Data Structures Lab"

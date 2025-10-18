@@ -2659,8 +2659,8 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`🔐 College Lab Registration System`);
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`📡 Local Access: http://localhost:${PORT}`);
-  console.log(`🌐 Network Access: http://10.10.46.182:${PORT}`); // CURRENT IP
-  console.log(`📊 CSV/Excel Import: http://10.10.46.182:${PORT}/import.html`); // CURRENT IP
+  console.log(`🌐 Network Access: http://10.10.194.103:${PORT}`); // CURRENT IP
+  console.log(`📊 CSV/Excel Import: http://10.10.194.103:${PORT}/import.html`); // CURRENT IP
   console.log(`📚 Student Database: Import via CSV/Excel files (ExcelJS - Secure)`);
   console.log(`🔑 Password reset: Available via DOB verification`);
   console.log(`📊 API Endpoints: /api/import-students, /api/download-template, /api/stats`);
