@@ -10,7 +10,7 @@
 ## 📋 **To Test the Forgot Password Feature:**
 
 ### **Option 1: Test Page**
-Open: `http://10.10.194.103:7401/test-forgot-password.html`
+Open: `http://192.168.29.212:7401/test-forgot-password.html`
 
 ### **Option 2: Student Kiosk**
 1. Open student kiosk

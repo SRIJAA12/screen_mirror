@@ -3,7 +3,7 @@ let socket = null;
 let pc = null;
 let sessionId = null;
 let localStream = null;
-const serverUrl = "http://192.168.29.212:8000";
+const serverUrl = "http://192.168.29.212:7401";
 
 console.log('🎬 FIXED Renderer.js loading...');
 

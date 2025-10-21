@@ -13,7 +13,7 @@ let currentSession = null;
 let sessionActive = false;
 
 // Server URL - updated to current network IP
-const SERVER_URL = 'http://10.10.194.103:7401';
+const SERVER_URL = 'http://192.168.29.212:7401';
 const LAB_ID = process.env.LAB_ID || "CC1";
 const SYSTEM_NUMBER = process.env.SYSTEM_NUMBER || `CC1-${String(Math.floor(Math.random() * 10) + 1).padStart(2, '0')}`;
 
@@ -284,6 +284,56 @@ function setupIPCHandlers() {
       });
       return await response.json();
     } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // System shutdown handler
+  ipcMain.handle('shutdown-system', async () => {
+    try {
+      console.log('🔌 System shutdown command received from admin');
+      
+      // Perform logout first if there's an active session
+      if (sessionActive && currentSession) {
+        console.log('🚪 Logging out before shutdown...');
+        await fetch(`${SERVER_URL}/api/student-logout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: currentSession.id }),
+        }).catch(err => console.error('❌ Logout error during shutdown:', err));
+      }
+      
+      // Import exec for executing system commands
+      const { exec } = require('child_process');
+      const platform = os.platform();
+      let shutdownCommand;
+      
+      if (platform === 'win32') {
+        // Windows: shutdown in 10 seconds with message
+        shutdownCommand = 'shutdown /s /t 10 /c "System shutdown initiated by administrator"';
+      } else if (platform === 'linux') {
+        // Linux: shutdown in 1 minute
+        shutdownCommand = 'sudo shutdown -h +1 "System shutdown initiated by administrator"';
+      } else if (platform === 'darwin') {
+        // macOS: shutdown in 1 minute
+        shutdownCommand = 'sudo shutdown -h +1 "System shutdown initiated by administrator"';
+      }
+      
+      console.log(`🔌 Executing shutdown command: ${shutdownCommand}`);
+      
+      exec(shutdownCommand, (error, stdout, stderr) => {
+        if (error) {
+          console.error('❌ Shutdown command error:', error);
+        } else {
+          console.log('✅ Shutdown command executed successfully');
+          console.log('stdout:', stdout);
+          if (stderr) console.log('stderr:', stderr);
+        }
+      });
+      
+      return { success: true, message: 'Shutdown initiated' };
+    } catch (error) {
+      console.error('❌ Shutdown error:', error);
       return { success: false, error: error.message };
     }
   });

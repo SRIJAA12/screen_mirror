@@ -301,6 +301,78 @@
         .close-fullscreen:hover {
             background: rgba(255, 255, 255, 0.3);
         }
+        
+        /* Shutdown button styles */
+        .btn-shutdown {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-shutdown:hover {
+            background: #c82333;
+            transform: scale(1.05);
+        }
+        
+        .btn-expand {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            margin-right: 0.5rem;
+        }
+        
+        .btn-expand:hover {
+            background: #0056b3;
+            transform: scale(1.05);
+        }
+        
+        .student-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .connection-status {
+            font-size: 0.85rem;
+            color: #6c757d;
+            flex: 1;
+            text-align: right;
+        }
+        
+        /* Toast notification animations */
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -332,6 +404,9 @@
                 </button>
                 <button class="btn btn-warning" onclick="forceClearSessions()" style="background: #dc3545; color: white;">
                     🧹 Force Clear All
+                </button>
+                <button class="btn btn-danger" onclick="shutdownAllSystems()" style="background: #fd7e14; color: white; font-weight: bold;">
+                    ⚠️ Shutdown All Lab Systems
                 </button>
             </div>
 
@@ -403,7 +478,7 @@
         function initializeSocket() {
             console.log('🚀 Admin dashboard loading...');
             
-            socket = io('http://10.10.194.103:7401');
+            socket = io('http://192.168.29.212:7401');
             
             socket.on('connect', () => {
                 console.log('✅ Admin dashboard connected:', socket.id);
@@ -508,6 +583,17 @@
             socket.on('webrtc-ice-candidate', ({ candidate, sessionId }) => {
                 console.log('🧊 ✅ ADMIN RECEIVED ICE CANDIDATE from kiosk for session:', sessionId, candidate.type);
                 handleICECandidate(candidate, sessionId);
+            });
+            
+            // Listen for shutdown events
+            socket.on('shutdown-error', ({ sessionId, error }) => {
+                console.error('❌ Shutdown error for session:', sessionId, error);
+                showNotification(`Shutdown failed: ${error}`, 'danger');
+            });
+
+            socket.on('shutdown-all-complete', ({ labId, count }) => {
+                console.log(`✅ Shutdown complete for ${count} systems in lab ${labId}`);
+                showNotification(`Successfully sent shutdown to ${count} systems`, 'success');
             });
         }
 
@@ -665,6 +751,7 @@
                 </div>
                 <div class="student-actions">
                     <button onclick="expandVideo('${sessionId}')" class="btn-expand">🔍 Expand</button>
+                    <button onclick="shutdownSystem('${sessionId}', '${sessionData.systemNumber}')" class="btn-shutdown" title="Shutdown this system">🔌 Shutdown</button>
                     <div class="connection-status" id="status-${sessionId}">🔄 Auto-connecting...</div>
                 </div>
             `;
@@ -919,6 +1006,79 @@
             document.getElementById('fullscreen-modal').classList.remove('active');
             document.body.style.overflow = 'auto';
             document.getElementById('fullscreen-video').srcObject = null;
+        }
+
+        // Shutdown specific system
+        function shutdownSystem(sessionId, systemNumber) {
+            if (confirm(`⚠️ SHUTDOWN CONFIRMATION\n\nAre you sure you want to shutdown ${systemNumber}?\n\nThis will:\n- Immediately notify the student\n- Logout their session\n- Shut down their computer in 10 seconds\n\nContinue?`)) {
+                console.log(`🔌 Sending shutdown command for session: ${sessionId}`);
+                socket.emit('shutdown-system', { sessionId });
+                
+                // Show feedback
+                const statusElement = document.getElementById(`status-${sessionId}`);
+                if (statusElement) {
+                    statusElement.innerHTML = '🔌 Shutdown initiated...';
+                    statusElement.style.color = '#dc3545';
+                }
+                
+                // Show toast notification
+                showNotification(`Shutdown command sent to ${systemNumber}`, 'warning');
+            }
+        }
+
+        // Shutdown all systems in the lab
+        function shutdownAllSystems() {
+            const activeCount = connectedStudents.size;
+            
+            if (activeCount === 0) {
+                alert('❌ No active systems to shutdown.');
+                return;
+            }
+            
+            if (confirm(`⚠️⚠️⚠️ SHUTDOWN ALL SYSTEMS ⚠️⚠️⚠️\n\nThis will shutdown ALL ${activeCount} active lab computers!\n\nEach student will:\n- Receive an immediate warning\n- Be logged out automatically\n- Have their computer shut down in 10 seconds\n\nThis action cannot be undone!\n\nAre you ABSOLUTELY SURE?`)) {
+                const labId = 'CC1'; // Default lab ID - you can make this dynamic if needed
+                console.log(`🔌 Sending shutdown ALL command for lab: ${labId}`);
+                socket.emit('shutdown-all-systems', { labId });
+                
+                // Show feedback for all students
+                connectedStudents.forEach((student, sessionId) => {
+                    const statusElement = document.getElementById(`status-${sessionId}`);
+                    if (statusElement) {
+                        statusElement.innerHTML = '🔌 Shutdown initiated...';
+                        statusElement.style.color = '#dc3545';
+                    }
+                });
+                
+                // Show toast notification
+                showNotification(`Shutdown command sent to ALL ${activeCount} systems`, 'danger');
+            }
+        }
+
+        // Show notification toast
+        function showNotification(message, type = 'info') {
+            // Create toast element
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${type === 'danger' ? '#dc3545' : type === 'warning' ? '#fd7e14' : '#28a745'};
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 10000;
+                animation: slideIn 0.3s ease;
+                font-weight: 500;
+            `;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            // Remove after 4 seconds
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
         }
 
         // Update statistics

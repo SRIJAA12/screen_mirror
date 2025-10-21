@@ -3,7 +3,7 @@ let socket = null;
 let pc = null;
 let sessionId = null;
 let localStream = null;
-const serverUrl = "http://10.10.194.103:7401";
+const serverUrl = "http://192.168.29.212:7401";
 
 console.log('🎬 FIXED Renderer.js loading...');
 
@@ -34,6 +34,9 @@ function initializeSocket() {
   
   // Listen for ICE candidates
   socket.on('webrtc-ice-candidate', handleICECandidate);
+  
+  // Listen for shutdown command from admin
+  socket.on('execute-shutdown', handleShutdownCommand);
 }
 
 // Initialize immediately
@@ -312,5 +315,41 @@ window.electronAPI.onStopLiveStream(() => {
   }
   sessionId = null;
 });
+
+// Handle shutdown command from admin
+async function handleShutdownCommand() {
+  console.log('🔌 ⚠️ SHUTDOWN COMMAND RECEIVED FROM ADMIN');
+  
+  // Show warning to student
+  alert('⚠️ SYSTEM SHUTDOWN\n\nThis computer is being shut down by the administrator.\n\nPlease save your work immediately.\n\nShutdown will occur in 10 seconds...');
+  
+  try {
+    // Clean up screen stream
+    if (localStream) {
+      console.log('🧹 Cleaning up screen stream...');
+      localStream.getTracks().forEach(track => track.stop());
+      localStream = null;
+    }
+    
+    // Close peer connection
+    if (pc) {
+      console.log('🧹 Closing peer connection...');
+      pc.close();
+      pc = null;
+    }
+    
+    // Request logout and shutdown from main process
+    console.log('🔌 Initiating system shutdown...');
+    const result = await window.electronAPI.shutdownSystem();
+    
+    if (result.success) {
+      console.log('✅ Shutdown initiated successfully');
+    } else {
+      console.error('❌ Shutdown failed:', result.error);
+    }
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+  }
+}
 
 console.log('🎬 FIXED Renderer.js loaded and ready');

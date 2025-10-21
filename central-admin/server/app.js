@@ -2630,6 +2630,63 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Shutdown specific system
+  socket.on('shutdown-system', ({ sessionId }) => {
+    console.log(`🔌 Shutdown command received for session: ${sessionId}`);
+    
+    const kioskSocketId = kioskSockets.get(sessionId);
+    if (kioskSocketId) {
+      io.to(kioskSocketId).emit('execute-shutdown');
+      console.log(`✅ Shutdown signal sent to kiosk: ${kioskSocketId}`);
+      
+      // Log the shutdown action
+      Session.findByIdAndUpdate(sessionId, {
+        shutdownInitiatedAt: new Date(),
+        shutdownBy: 'admin'
+      }).catch(err => console.error('❌ Error logging shutdown:', err));
+    } else {
+      console.warn('⚠️ Kiosk not connected for session:', sessionId);
+      socket.emit('shutdown-error', { sessionId, error: 'Student not connected' });
+    }
+  });
+
+  // Shutdown all systems in a lab
+  socket.on('shutdown-all-systems', async ({ labId }) => {
+    console.log(`🔌 Shutdown ALL systems command received for lab: ${labId}`);
+    
+    try {
+      // Get all active sessions in this lab
+      const activeSessions = await Session.find({ 
+        labId: labId, 
+        status: 'active' 
+      });
+      
+      console.log(`📋 Found ${activeSessions.length} active sessions in lab ${labId}`);
+      
+      let shutdownCount = 0;
+      for (const session of activeSessions) {
+        const kioskSocketId = kioskSockets.get(session._id.toString());
+        if (kioskSocketId) {
+          io.to(kioskSocketId).emit('execute-shutdown');
+          shutdownCount++;
+          console.log(`✅ Shutdown signal sent to session: ${session._id}`);
+          
+          // Log the shutdown action
+          Session.findByIdAndUpdate(session._id, {
+            shutdownInitiatedAt: new Date(),
+            shutdownBy: 'admin-all'
+          }).catch(err => console.error('❌ Error logging shutdown:', err));
+        }
+      }
+      
+      console.log(`✅ Shutdown signal broadcast to ${shutdownCount} systems in lab ${labId}`);
+      socket.emit('shutdown-all-complete', { labId, count: shutdownCount });
+    } catch (error) {
+      console.error('❌ Error shutting down all systems:', error);
+      socket.emit('shutdown-error', { labId, error: error.message });
+    }
+  });
+
   socket.on('disconnect', () => { 
     console.log("❌ Socket disconnected:", socket.id); 
     
@@ -2659,8 +2716,8 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`🔐 College Lab Registration System`);
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`📡 Local Access: http://localhost:${PORT}`);
-  console.log(`🌐 Network Access: http://10.10.194.103:${PORT}`); // CURRENT IP
-  console.log(`📊 CSV/Excel Import: http://10.10.194.103:${PORT}/import.html`); // CURRENT IP
+  console.log(`🌐 Network Access: http://192.168.29.212:${PORT}`); // CURRENT IP
+  console.log(`📊 CSV/Excel Import: http://192.168.29.212:${PORT}/import.html`); // CURRENT IP
   console.log(`📚 Student Database: Import via CSV/Excel files (ExcelJS - Secure)`);
   console.log(`🔑 Password reset: Available via DOB verification`);
   console.log(`📊 API Endpoints: /api/import-students, /api/download-template, /api/stats`);

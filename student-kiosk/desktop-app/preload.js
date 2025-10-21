@@ -26,6 +26,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Listen for session created event and stop live stream command
   onSessionCreated: (callback) => ipcRenderer.on('session-created', (event, data) => callback(data)),
   onStopLiveStream: (callback) => ipcRenderer.on('stop-live-stream', () => callback()),
+  
+  // System shutdown
+  shutdownSystem: () => ipcRenderer.invoke('shutdown-system'),
 });
 
 // Security measures: block right click context menu
