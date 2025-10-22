@@ -396,9 +396,6 @@
                 <button class="btn btn-primary" onclick="refreshStudentList()">
                     🔄 Refresh Students
                 </button>
-                <button class="btn btn-secondary" onclick="exportSessionData()">
-                    📊 Export CSV
-                </button>
                 <button class="btn btn-secondary" onclick="debugSessionData()" style="background: #ffc107; color: #000;">
                     🔍 Debug Data
                 </button>
@@ -413,7 +410,7 @@
             <!-- Session Info -->
             <div id="session-info" style="display: none; background: #e8f5e8; border: 2px solid #28a745; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
                 <h3 style="color: #155724; margin-bottom: 0.5rem;">📚 Current Lab Session</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
                     <div><strong>Subject:</strong> <span id="current-subject">-</span></div>
                     <div><strong>Faculty:</strong> <span id="current-faculty">-</span></div>
                     <div><strong>Year:</strong> <span id="current-year">-</span></div>
@@ -421,6 +418,42 @@
                     <div><strong>Section:</strong> <span id="current-section">-</span></div>
                     <div><strong>Duration:</strong> <span id="current-duration">-</span></div>
                     <div><strong>Started:</strong> <span id="current-start-time">-</span></div>
+                </div>
+                
+                <!-- Duration Control Panel -->
+                <div style="background: white; border-radius: 6px; padding: 1rem; border: 2px solid #20c997;">
+                    <h4 style="color: #20c997; margin-bottom: 0.75rem; font-size: 1rem;">⏱️ Adjust Session Duration</h4>
+                    
+                    <!-- Quick Adjust (50 min per period) -->
+                    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                        <button onclick="adjustSessionDuration(-1)" class="btn btn-warning" style="padding: 0.5rem 1rem;">
+                            ➖ Remove 1 Period (50 min)
+                        </button>
+                        <div style="font-weight: 600; color: #2c3e50; padding: 0.5rem 1rem; background: #f8f9fa; border-radius: 6px;">
+                            <span id="current-periods-display">-</span> Periods (<span id="current-minutes-display">-</span> min)
+                        </div>
+                        <button onclick="adjustSessionDuration(1)" class="btn btn-success" style="padding: 0.5rem 1rem;">
+                            ➕ Add 1 Period (50 min)
+                        </button>
+                    </div>
+                    
+                    <!-- Custom Time Adjustment -->
+                    <div style="border-top: 1px solid #dee2e6; padding-top: 1rem;">
+                        <label style="display: block; font-weight: 600; color: #2c3e50; margin-bottom: 0.5rem;">Custom Time Adjustment:</label>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                            <button onclick="adjustSessionByMinutes('decrease')" class="btn btn-warning" style="padding: 0.4rem 0.8rem; font-size: 0.9rem;">
+                                ➖ Decrease
+                            </button>
+                            <input type="number" id="custom-time-input" min="5" max="100" step="5" value="10" 
+                                   style="width: 80px; padding: 0.4rem; border: 2px solid #ced4da; border-radius: 4px; text-align: center; font-weight: 600;">
+                            <span style="color: #6c757d; font-weight: 600;">minutes</span>
+                            <button onclick="adjustSessionByMinutes('increase')" class="btn btn-success" style="padding: 0.4rem 0.8rem; font-size: 0.9rem;">
+                                ➕ Increase
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <small style="color: #6c757d; display: block; margin-top: 0.75rem;">💡 Quick: Use ±1 period (50 min) | Custom: Choose your own time increment</small>
                 </div>
             </div>
 
@@ -450,13 +483,95 @@
                 </div>
             </div>
         </div>
+
+        <!-- Report Schedule Settings Section -->
+        <div class="control-panel" style="margin-top: 2rem;">
+            <h2>📅 Automatic Report Schedule</h2>
+            <p style="color: #6c757d; margin-bottom: 1.5rem;">Configure automatic daily report generation times (up to 2 schedules per day). Reports will download to your browser automatically at the scheduled times.</p>
+            
+            <div style="background: #f8f9fa; border-radius: 8px; padding: 1.5rem;">
+                <div style="margin-bottom: 2rem;">
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #2c3e50;">
+                            <strong>Lab ID:</strong>
+                        </label>
+                        <select id="scheduleLabId" style="padding: 10px; width: 100%; max-width: 300px; border-radius: 6px; border: 1px solid #ced4da; font-size: 1rem;">
+                            <option value="CC1">CC1 - Computer Lab 1</option>
+                            <option value="CC2">CC2 - Computer Lab 2</option>
+                            <option value="LAB-01">LAB-01 - General Lab</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Schedule 1 -->
+                <div style="background: white; border: 2px solid #28a745; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem;">
+                    <h4 style="color: #28a745; margin-bottom: 1rem;">🕐 Schedule 1 (Morning/Afternoon)</h4>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; align-items: end;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #2c3e50;">
+                                <strong>Report Generation Time (24-hour):</strong>
+                            </label>
+                            <input type="time" id="scheduleTime1" style="padding: 10px; width: 100%; border-radius: 6px; border: 1px solid #ced4da; font-size: 1rem;" value="13:00">
+                        </div>
+                        <div>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="scheduleEnabled1" checked style="margin-right: 10px; width: 20px; height: 20px; cursor: pointer;">
+                                <span style="font-weight: 600; color: #2c3e50;">Enable</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Schedule 2 -->
+                <div style="background: white; border: 2px solid #007bff; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem;">
+                    <h4 style="color: #007bff; margin-bottom: 1rem;">🕕 Schedule 2 (Evening)</h4>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; align-items: end;">
+                        <div>
+                            <label style="display: block; font-weight: 600; margin-bottom: 0.5rem; color: #2c3e50;">
+                                <strong>Report Generation Time (24-hour):</strong>
+                            </label>
+                            <input type="time" id="scheduleTime2" style="padding: 10px; width: 100%; border-radius: 6px; border: 1px solid #ced4da; font-size: 1rem;" value="18:00">
+                        </div>
+                        <div>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="scheduleEnabled2" checked style="margin-right: 10px; width: 20px; height: 20px; cursor: pointer;">
+                                <span style="font-weight: 600; color: #2c3e50;">Enable</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem;">
+                    <button onclick="saveSchedule()" class="btn btn-success">
+                        💾 Save Schedule
+                    </button>
+                    
+                    <button onclick="loadSchedule()" class="btn btn-secondary">
+                        🔄 Load Current Schedule
+                    </button>
+                    
+                    <button onclick="generateReportNow()" class="btn btn-primary">
+                        📊 Generate Report Now (Test)
+                    </button>
+                </div>
+                
+                <div id="scheduleStatus" style="margin-top: 15px; padding: 12px; border-radius: 8px; display: none;"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Fullscreen Modal -->
     <div id="fullscreen-modal" class="fullscreen-modal">
         <button class="close-fullscreen" onclick="closeFullscreen()">×</button>
+        <button id="snapshotBtn" onclick="takeSnapshot()" style="display:none; position:absolute; top:20px; right:80px; z-index:12; background:#28a745; color:white; border:none; padding:0.75rem 1.5rem; border-radius:6px; cursor:pointer; font-size:1rem; font-weight:600; box-shadow:0 4px 6px rgba(0,0,0,0.3);">
+            📸 Take Snapshot
+        </button>
         <div class="fullscreen-content">
             <video id="fullscreen-video" class="fullscreen-video" autoplay muted></video>
+            <div id="fullscreen-student-info" style="position:absolute; top:20px; left:20px; background:rgba(0,0,0,0.7); color:white; padding:1rem; border-radius:8px; font-size:0.9rem; z-index:11;">
+                <strong id="fullscreen-student-name">-</strong><br>
+                <small id="fullscreen-student-details">-</small>
+            </div>
         </div>
     </div>
 
@@ -594,6 +709,30 @@
             socket.on('shutdown-all-complete', ({ labId, count }) => {
                 console.log(`✅ Shutdown complete for ${count} systems in lab ${labId}`);
                 showNotification(`Successfully sent shutdown to ${count} systems`, 'success');
+            });
+
+            // Listen for scheduled report ready events
+            socket.on('scheduled-report-ready', ({ labId, filename, csvContent, count, timestamp }) => {
+                console.log('📊 ✅ SCHEDULED REPORT READY:', { labId, filename, count });
+                console.log('📥 Auto-downloading report to browser...');
+                
+                // Create blob from CSV content
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                console.log('✅ Report auto-downloaded:', filename);
+                
+                // Show notification
+                showNotification(`📊 Report auto-downloaded: ${filename} (${count} sessions)`, 'success');
             });
         }
 
@@ -882,10 +1021,24 @@
                 // Monitor connection state
                 peerConnection.onconnectionstatechange = () => {
                     console.log('🔄 Connection state changed for session:', sessionId, peerConnection.connectionState);
+                    const statusDiv = document.getElementById(`status-${sessionId}`);
+                    
                     if (peerConnection.connectionState === 'connected') {
                         console.log('✅ ✅ WebRTC CONNECTED for session:', sessionId, '- Video should be flowing now!');
+                        if (statusDiv) {
+                            statusDiv.innerHTML = '✅ Connected';
+                            statusDiv.style.color = '#28a745';
+                        }
                     } else if (peerConnection.connectionState === 'failed') {
                         console.error('❌ WebRTC connection failed for session:', sessionId);
+                        if (statusDiv) {
+                            statusDiv.innerHTML = '❌ Connection failed';
+                            statusDiv.style.color = '#dc3545';
+                        }
+                    } else if (peerConnection.connectionState === 'connecting') {
+                        if (statusDiv) {
+                            statusDiv.innerHTML = '🔗 Connecting...';
+                        }
                     }
                 };
                 
@@ -894,6 +1047,13 @@
                     console.log('🧊 ICE connection state changed for session:', sessionId, peerConnection.iceConnectionState);
                     if (peerConnection.iceConnectionState === 'connected') {
                         console.log('✅ ICE CONNECTED for session:', sessionId);
+                    } else if (peerConnection.iceConnectionState === 'failed') {
+                        console.error('❌ ICE connection FAILED for session:', sessionId);
+                        const statusDiv = document.getElementById(`status-${sessionId}`);
+                        if (statusDiv) {
+                            statusDiv.innerHTML = '❌ ICE failed - Check network';
+                            statusDiv.style.color = '#dc3545';
+                        }
                     }
                 };
                 
@@ -960,10 +1120,23 @@
         }
 
         // Handle WebRTC answer
-        function handleWebRTCAnswer(answer, sessionId) {
+        async function handleWebRTCAnswer(answer, sessionId) {
             const peerConnection = monitoringConnections.get(sessionId);
             if (peerConnection) {
-                peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+                console.log('✅ ADMIN: Received answer from kiosk for session:', sessionId);
+                try {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+                    console.log('✅ ADMIN: Remote description set successfully for session:', sessionId);
+                    
+                    const statusDiv = document.getElementById(`status-${sessionId}`);
+                    if (statusDiv) {
+                        statusDiv.innerHTML = '🔗 Connecting...';
+                    }
+                } catch (error) {
+                    console.error('❌ ADMIN: Error setting remote description:', error);
+                }
+            } else {
+                console.error('❌ ADMIN: No peer connection found for session:', sessionId);
             }
         }
 
@@ -995,17 +1168,115 @@
             }
             
             const fullscreenVideo = document.getElementById('fullscreen-video');
+            const fullscreenModal = document.getElementById('fullscreen-modal');
+            const snapshotBtn = document.getElementById('snapshotBtn');
+            
+            // Copy stream to fullscreen video
             fullscreenVideo.srcObject = video.srcObject;
             
-            document.getElementById('fullscreen-modal').classList.add('active');
+            // Store session ID for snapshot
+            fullscreenVideo.dataset.sessionId = sessionId;
+            
+            // Update student info
+            const studentData = connectedStudents.get(sessionId);
+            if (studentData) {
+                document.getElementById('fullscreen-student-name').textContent = studentData.studentName || 'Unknown Student';
+                document.getElementById('fullscreen-student-details').textContent = `Roll: ${studentData.studentId} | System: ${studentData.systemNumber}`;
+            }
+            
+            // Show snapshot button when video is playing
+            fullscreenVideo.onplaying = () => {
+                console.log('📸 Video playing - showing snapshot button');
+                snapshotBtn.style.display = 'block';
+            };
+            
+            // Hide snapshot button if video pauses or ends
+            fullscreenVideo.onpause = () => {
+                snapshotBtn.style.display = 'none';
+            };
+            
+            fullscreenVideo.onerror = () => {
+                snapshotBtn.style.display = 'none';
+            };
+            
+            // Show modal
+            fullscreenModal.classList.add('active');
             document.body.style.overflow = 'hidden';
         }
 
         // Close fullscreen
         function closeFullscreen() {
-            document.getElementById('fullscreen-modal').classList.remove('active');
+            const fullscreenModal = document.getElementById('fullscreen-modal');
+            const fullscreenVideo = document.getElementById('fullscreen-video');
+            const snapshotBtn = document.getElementById('snapshotBtn');
+            
+            fullscreenModal.classList.remove('active');
             document.body.style.overflow = 'auto';
-            document.getElementById('fullscreen-video').srcObject = null;
+            fullscreenVideo.srcObject = null;
+            snapshotBtn.style.display = 'none';
+        }
+        
+        // Take snapshot from fullscreen video
+        function takeSnapshot() {
+            console.log('📸 Take snapshot button clicked');
+            
+            const fullscreenVideo = document.getElementById('fullscreen-video');
+            
+            if (!fullscreenVideo || !fullscreenVideo.srcObject) {
+                alert('❌ No video stream found to capture snapshot');
+                return;
+            }
+            
+            // Check if video has valid dimensions
+            if (fullscreenVideo.videoWidth === 0 || fullscreenVideo.videoHeight === 0) {
+                alert('❌ Video dimensions are invalid. Please wait for the video to load properly.');
+                console.error('❌ Invalid video dimensions:', fullscreenVideo.videoWidth, fullscreenVideo.videoHeight);
+                return;
+            }
+            
+            console.log('📸 Creating canvas with dimensions:', fullscreenVideo.videoWidth, fullscreenVideo.videoHeight);
+            
+            // Create canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = fullscreenVideo.videoWidth;
+            canvas.height = fullscreenVideo.videoHeight;
+            
+            // Draw video frame to canvas
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(fullscreenVideo, 0, 0, canvas.width, canvas.height);
+            
+            // Get session data for filename
+            const sessionId = fullscreenVideo.dataset.sessionId;
+            const studentData = connectedStudents.get(sessionId);
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const filename = `snapshot_${studentData ? studentData.systemNumber : 'unknown'}_${timestamp}.png`;
+            
+            console.log('📸 Converting canvas to blob...');
+            
+            // Convert to blob and download
+            canvas.toBlob(function(blob) {
+                if (!blob) {
+                    alert('❌ Failed to create snapshot image');
+                    console.error('❌ Blob creation failed');
+                    return;
+                }
+                
+                console.log('✅ Blob created, size:', blob.size, 'bytes');
+                console.log('📥 Downloading as:', filename);
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                console.log('✅ Snapshot downloaded successfully');
+                showNotification(`📸 Snapshot captured: ${filename}`, 'info');
+            }, 'image/png');
         }
 
         // Shutdown specific system
@@ -1161,12 +1432,22 @@
                     
                     <div style="margin-bottom: 1.5rem;">
                         <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Number of Periods (50 min each):</label>
-                        <select id="session-periods" style="width: 100%; padding: 0.75rem; border: 2px solid #e9ecef; border-radius: 6px; font-size: 1rem;">
-                            <option value="1">1 Period (50 minutes)</option>
-                            <option value="2">2 Periods (100 minutes)</option>
-                            <option value="3">3 Periods (150 minutes)</option>
-                            <option value="4">4 Periods (200 minutes)</option>
-                        </select>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <button onclick="decrementPeriods(); event.preventDefault();" 
+                                    style="padding: 0.75rem 1.5rem; font-size: 1.5rem; font-weight: bold; border: 2px solid #6c757d; background: white; color: #6c757d; border-radius: 6px; cursor: pointer; min-width: 50px;">
+                                −
+                            </button>
+                            <div style="flex: 1; text-align: center; padding: 0.75rem; border: 2px solid #e9ecef; border-radius: 6px; background: #f8f9fa; font-size: 1.1rem; font-weight: 600;">
+                                <span id="session-periods-display">2</span> Periods 
+                                (<span id="session-duration-display">100</span> minutes)
+                            </div>
+                            <button onclick="incrementPeriods(); event.preventDefault();" 
+                                    style="padding: 0.75rem 1.5rem; font-size: 1.5rem; font-weight: bold; border: 2px solid #28a745; background: #28a745; color: white; border-radius: 6px; cursor: pointer; min-width: 50px;">
+                                +
+                            </button>
+                        </div>
+                        <input type="hidden" id="session-periods" value="2">
+                        <small style="color: #6c757d; display: block; margin-top: 0.5rem;">Click +/− to adjust session duration</small>
                     </div>
                     
                     <div style="display: flex; gap: 1rem; justify-content: flex-end;">
@@ -1184,6 +1465,36 @@
             
             document.body.appendChild(dialog);
             document.getElementById('session-subject').focus();
+        }
+
+        // Increment periods
+        function incrementPeriods() {
+            const periodsInput = document.getElementById('session-periods');
+            const periodsDisplay = document.getElementById('session-periods-display');
+            const durationDisplay = document.getElementById('session-duration-display');
+            
+            let currentPeriods = parseInt(periodsInput.value);
+            if (currentPeriods < 6) {  // Max 6 periods (300 minutes)
+                currentPeriods++;
+                periodsInput.value = currentPeriods;
+                periodsDisplay.textContent = currentPeriods;
+                durationDisplay.textContent = currentPeriods * 50;
+            }
+        }
+
+        // Decrement periods
+        function decrementPeriods() {
+            const periodsInput = document.getElementById('session-periods');
+            const periodsDisplay = document.getElementById('session-periods-display');
+            const durationDisplay = document.getElementById('session-duration-display');
+            
+            let currentPeriods = parseInt(periodsInput.value);
+            if (currentPeriods > 1) {  // Min 1 period (50 minutes)
+                currentPeriods--;
+                periodsInput.value = currentPeriods;
+                periodsDisplay.textContent = currentPeriods;
+                durationDisplay.textContent = currentPeriods * 50;
+            }
         }
 
         // Close session start dialog
@@ -1312,21 +1623,12 @@
         // Show session end reminder
         function showSessionEndReminder() {
             if (sessionActive && currentLabSession) {
-                const reminder = confirm(
+                alert(
                     `⏰ Session Time Complete!\n\n` +
                     `Subject: ${currentLabSession.subject}\n` +
                     `Duration: ${currentLabSession.periods} periods completed\n\n` +
-                    `Please export the CSV file now before ending the session.\n\n` +
-                    `Click OK to export CSV, or Cancel to end session without export.`
+                    `Reports are automatically saved. You can end the session now.`
                 );
-                
-                if (reminder) {
-                    exportSessionData();
-                } else {
-                    if (confirm('Are you sure you want to end the session without exporting data?')) {
-                        endLabSession();
-                    }
-                }
             }
         }
 
@@ -1343,20 +1645,168 @@
         }
 
         // Update session info display
-        function updateSessionInfo(sessionData) {
+        function updateSessionInfo(session) {
+            document.getElementById('current-subject').textContent = session.subject;
+            document.getElementById('current-faculty').textContent = session.faculty;
+            document.getElementById('current-year').textContent = `${session.year}${session.year === 1 ? 'st' : session.year === 2 ? 'nd' : session.year === 3 ? 'rd' : 'th'} Year`;
+            document.getElementById('current-department').textContent = session.department;
+            document.getElementById('current-section').textContent = session.section === 'None' ? 'No Section' : `Section ${session.section}`;
+            document.getElementById('current-duration').textContent = `${session.periods} periods (${session.expectedDuration} min)`;
+            document.getElementById('current-start-time').textContent = new Date(session.startTime).toLocaleTimeString();
+            
+            // Update duration control display
+            document.getElementById('current-periods-display').textContent = session.periods;
+            document.getElementById('current-minutes-display').textContent = session.expectedDuration;
+            
             document.getElementById('session-info').style.display = 'block';
-            document.getElementById('current-subject').textContent = sessionData.subject;
-            document.getElementById('current-faculty').textContent = sessionData.faculty;
-            document.getElementById('current-year').textContent = `${sessionData.year}${sessionData.year === 1 ? 'st' : sessionData.year === 2 ? 'nd' : sessionData.year === 3 ? 'rd' : 'th'} Year`;
-            document.getElementById('current-department').textContent = sessionData.department;
-            document.getElementById('current-section').textContent = sessionData.section === 'None' ? 'No Section' : `Section ${sessionData.section}`;
-            document.getElementById('current-duration').textContent = `${sessionData.periods} periods (${sessionData.expectedDuration} min)`;
-            document.getElementById('current-start-time').textContent = new Date(sessionData.startTime).toLocaleTimeString();
         }
-
-        // Hide session info display
+        
+        // Hide session info
         function hideSessionInfo() {
             document.getElementById('session-info').style.display = 'none';
+        }
+        
+        // Adjust session duration after it has started
+        async function adjustSessionDuration(change) {
+            if (!currentLabSession) {
+                alert('❌ No active session to adjust.');
+                return;
+            }
+            
+            const newPeriods = currentLabSession.periods + change;
+            
+            // Validate limits
+            if (newPeriods < 1) {
+                alert('❌ Cannot reduce below 1 period (50 minutes).');
+                return;
+            }
+            if (newPeriods > 6) {
+                alert('❌ Cannot increase beyond 6 periods (300 minutes).');
+                return;
+            }
+            
+            const newDuration = newPeriods * 50;
+            
+            if (!confirm(`Adjust session duration?\n\nCurrent: ${currentLabSession.periods} periods (${currentLabSession.expectedDuration} min)\nNew: ${newPeriods} periods (${newDuration} min)\n\nThis will ${change > 0 ? 'extend' : 'reduce'} the session time.`)) {
+                return;
+            }
+            
+            try {
+                // Update on server
+                const response = await fetch('/api/update-session-duration', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        sessionId: currentLabSession._id,
+                        periods: newPeriods,
+                        expectedDuration: newDuration
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update local session data
+                    currentLabSession.periods = newPeriods;
+                    currentLabSession.expectedDuration = newDuration;
+                    
+                    // Recalculate end time
+                    const now = new Date();
+                    const startTime = new Date(currentLabSession.startTime);
+                    const elapsed = now - startTime;
+                    const remainingTime = (newDuration * 60 * 1000) - elapsed;
+                    sessionEndTime = new Date(now.getTime() + remainingTime);
+                    
+                    // Update UI
+                    document.getElementById('current-duration').textContent = `${newPeriods} periods (${newDuration} min)`;
+                    document.getElementById('current-periods-display').textContent = newPeriods;
+                    document.getElementById('current-minutes-display').textContent = newDuration;
+                    
+                    console.log('✅ Session duration updated:', { periods: newPeriods, duration: newDuration });
+                    alert(`✅ Session duration ${change > 0 ? 'increased' : 'decreased'} successfully!\n\nNew duration: ${newPeriods} periods (${newDuration} minutes)\nSession will now end at: ${sessionEndTime.toLocaleTimeString()}`);
+                } else {
+                    alert('❌ Failed to update duration: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error adjusting duration:', error);
+                alert('❌ Error adjusting duration. Please try again.');
+            }
+        }
+        
+        // Adjust session by custom minutes
+        async function adjustSessionByMinutes(action) {
+            if (!currentLabSession) {
+                alert('❌ No active session to adjust.');
+                return;
+            }
+            
+            const customMinutes = parseInt(document.getElementById('custom-time-input').value);
+            
+            if (!customMinutes || customMinutes < 5 || customMinutes > 100) {
+                alert('❌ Please enter a valid time between 5 and 100 minutes.');
+                return;
+            }
+            
+            const changeInMinutes = action === 'increase' ? customMinutes : -customMinutes;
+            const newDuration = currentLabSession.expectedDuration + changeInMinutes;
+            
+            // Validate limits (50-300 minutes = 1-6 periods)
+            if (newDuration < 50) {
+                alert('❌ Cannot reduce below 50 minutes (1 period).');
+                return;
+            }
+            if (newDuration > 300) {
+                alert('❌ Cannot increase beyond 300 minutes (6 periods).');
+                return;
+            }
+            
+            // Calculate periods (round to nearest 0.5)
+            const newPeriods = Math.round((newDuration / 50) * 2) / 2;
+            
+            if (!confirm(`Adjust session duration by ${customMinutes} minutes?\n\nCurrent: ${currentLabSession.expectedDuration} min\nNew: ${newDuration} min (≈${newPeriods} periods)\n\nThis will ${action === 'increase' ? 'extend' : 'reduce'} the session time.`)) {
+                return;
+            }
+            
+            try {
+                // Update on server with new duration
+                const response = await fetch('/api/update-session-duration', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        sessionId: currentLabSession._id,
+                        periods: newPeriods,
+                        expectedDuration: newDuration
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update local session data
+                    currentLabSession.periods = newPeriods;
+                    currentLabSession.expectedDuration = newDuration;
+                    
+                    // Recalculate end time
+                    const now = new Date();
+                    const startTime = new Date(currentLabSession.startTime);
+                    const elapsed = now - startTime;
+                    const remainingTime = (newDuration * 60 * 1000) - elapsed;
+                    sessionEndTime = new Date(now.getTime() + remainingTime);
+                    
+                    // Update UI
+                    document.getElementById('current-duration').textContent = `${newPeriods} periods (${newDuration} min)`;
+                    document.getElementById('current-periods-display').textContent = newPeriods;
+                    document.getElementById('current-minutes-display').textContent = newDuration;
+                    
+                    console.log('✅ Session duration updated:', { periods: newPeriods, duration: newDuration });
+                    alert(`✅ Session duration ${action === 'increase' ? 'increased' : 'decreased'} by ${customMinutes} minutes!\n\nNew duration: ${newPeriods} periods (${newDuration} minutes)\nSession will now end at: ${sessionEndTime.toLocaleTimeString()}`);
+                } else {
+                    alert('❌ Failed to update duration: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error adjusting duration:', error);
+                alert('❌ Error adjusting duration. Please try again.');
+            }
         }
 
         // End lab session
@@ -1366,13 +1816,7 @@
                 return;
             }
 
-            // Check if CSV has been exported
-            if (!sessionExported) {
-                alert('❌ Cannot End Session!\n\nYou must export the CSV file first before ending the session.\n\nClick "Export CSV" button to download session data, then try ending the session again.');
-                return;
-            }
-
-            if (confirm('⚠️ Are you sure you want to end the current lab session?\n\nThis will:\n• Stop all screen monitoring\n• Clear all session data\n• Prepare for the next session\n\n✓ CSV data has been exported')) {
+            if (confirm('⚠️ Are you sure you want to end the current lab session?\n\nThis will:\n• Stop all screen monitoring\n• Clear all session data\n• Prepare for the next session')) {
                 // Send end session request to server
                 fetch('/api/end-lab-session', {
                     method: 'POST',
@@ -1411,7 +1855,7 @@
                         hideSessionInfo();
                         
                         console.log('🛑 Lab session ended and data cleared');
-                        alert('✅ Lab session ended successfully!\n\nAll session data has been cleared.\nReady for the next session.');
+                        alert('✅ Session Completed!');
                     } else {
                         alert('❌ Failed to end session: ' + data.error);
                     }
@@ -1637,9 +2081,203 @@ ${data.debug.labSessionStudentRecords?.map((s, i) =>
             }
         });
 
+        // =============================================================================
+        // AUTOMATIC REPORT SCHEDULING FUNCTIONS
+        // =============================================================================
+
+        // Load current schedule for selected lab
+        async function loadSchedule() {
+            const labId = document.getElementById('scheduleLabId').value;
+            const statusDiv = document.getElementById('scheduleStatus');
+            
+            try {
+                statusDiv.style.display = 'block';
+                statusDiv.style.background = '#fff3cd';
+                statusDiv.style.color = '#856404';
+                statusDiv.innerHTML = '⏳ Loading schedules...';
+                
+                const response = await fetch(`/api/report-schedule/${labId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Load schedule 1
+                    if (data.schedule.scheduleTime1) {
+                        document.getElementById('scheduleTime1').value = data.schedule.scheduleTime1;
+                        document.getElementById('scheduleEnabled1').checked = data.schedule.enabled1 !== false;
+                    }
+                    
+                    // Load schedule 2
+                    if (data.schedule.scheduleTime2) {
+                        document.getElementById('scheduleTime2').value = data.schedule.scheduleTime2;
+                        document.getElementById('scheduleEnabled2').checked = data.schedule.enabled2 !== false;
+                    }
+                    
+                    // Legacy support - if old format, load into schedule 1
+                    if (data.schedule.scheduleTime && !data.schedule.scheduleTime1) {
+                        document.getElementById('scheduleTime1').value = data.schedule.scheduleTime;
+                        document.getElementById('scheduleEnabled1').checked = data.schedule.enabled;
+                    }
+                    
+                    statusDiv.style.background = '#d4edda';
+                    statusDiv.style.color = '#155724';
+                    const schedule1Status = document.getElementById('scheduleEnabled1').checked ? '🟢 Enabled' : '🔴 Disabled';
+                    const schedule2Status = document.getElementById('scheduleEnabled2').checked ? '🟢 Enabled' : '🔴 Disabled';
+                    statusDiv.innerHTML = `
+                        ✅ Schedules loaded for ${labId}<br>
+                        <strong>Schedule 1:</strong> ${document.getElementById('scheduleTime1').value} - ${schedule1Status}<br>
+                        <strong>Schedule 2:</strong> ${document.getElementById('scheduleTime2').value} - ${schedule2Status}
+                        ${data.schedule.lastGenerated ? '<br><strong>Last Generated:</strong> ' + new Date(data.schedule.lastGenerated).toLocaleString() : ''}
+                    `;
+                } else {
+                    throw new Error(data.error || 'Failed to load schedule');
+                }
+            } catch (error) {
+                console.error('Error loading schedule:', error);
+                statusDiv.style.background = '#f8d7da';
+                statusDiv.style.color = '#721c24';
+                statusDiv.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+
+        // Save schedule configuration
+        async function saveSchedule() {
+            const labId = document.getElementById('scheduleLabId').value;
+            const scheduleTime1 = document.getElementById('scheduleTime1').value;
+            const enabled1 = document.getElementById('scheduleEnabled1').checked;
+            const scheduleTime2 = document.getElementById('scheduleTime2').value;
+            const enabled2 = document.getElementById('scheduleEnabled2').checked;
+            const statusDiv = document.getElementById('scheduleStatus');
+            
+            if (!scheduleTime1 && !scheduleTime2) {
+                alert('Please select at least one schedule time');
+                return;
+            }
+            
+            try {
+                statusDiv.style.display = 'block';
+                statusDiv.style.background = '#fff3cd';
+                statusDiv.style.color = '#856404';
+                statusDiv.innerHTML = '⏳ Saving schedules...';
+                
+                const response = await fetch('/api/report-schedule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        labId, 
+                        scheduleTime1, 
+                        enabled1,
+                        scheduleTime2,
+                        enabled2
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    statusDiv.style.background = '#d4edda';
+                    statusDiv.style.color = '#155724';
+                    
+                    let statusHTML = `✅ Schedules saved successfully!<br><strong>Lab:</strong> ${labId}<br>`;
+                    
+                    if (scheduleTime1 && enabled1) {
+                        statusHTML += `<strong>Schedule 1:</strong> ${scheduleTime1} - 🟢 Enabled<br>`;
+                    }
+                    if (scheduleTime2 && enabled2) {
+                        statusHTML += `<strong>Schedule 2:</strong> ${scheduleTime2} - 🟢 Enabled<br>`;
+                    }
+                    
+                    statusHTML += `<em>Reports will automatically download to your browser at the scheduled times every day.</em>`;
+                    
+                    statusDiv.innerHTML = statusHTML;
+                    console.log('✅ Schedules saved:', data.schedule);
+                } else {
+                    throw new Error(data.error || 'Failed to save schedule');
+                }
+            } catch (error) {
+                console.error('Error saving schedule:', error);
+                statusDiv.style.background = '#f8d7da';
+                statusDiv.style.color = '#721c24';
+                statusDiv.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+
+        // Generate report immediately for testing - downloads to browser
+        async function generateReportNow() {
+            const labId = document.getElementById('scheduleLabId').value;
+            const statusDiv = document.getElementById('scheduleStatus');
+            
+            if (!confirm(`Generate and download report now for ${labId}?\n\nThis will download a CSV file with today's sessions to your computer.`)) {
+                return;
+            }
+            
+            try {
+                statusDiv.style.display = 'block';
+                statusDiv.style.background = '#fff3cd';
+                statusDiv.style.color = '#856404';
+                statusDiv.innerHTML = '⏳ Generating report...';
+                
+                const response = await fetch('/api/generate-report-now', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ labId })
+                });
+                
+                if (response.ok) {
+                    // Get filename from Content-Disposition header
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    const filenameMatch = contentDisposition && contentDisposition.match(/filename="(.+)"/);
+                    const filename = filenameMatch ? filenameMatch[1] : `${labId}-sessions-${new Date().toISOString().split('T')[0]}.csv`;
+                    
+                    // Get CSV content
+                    const blob = await response.blob();
+                    
+                    // Create download link
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    statusDiv.style.background = '#d4edda';
+                    statusDiv.style.color = '#155724';
+                    statusDiv.innerHTML = `
+                        ✅ Report downloaded successfully!<br>
+                        <strong>Filename:</strong> ${filename}<br>
+                        <em>Check your Downloads folder</em>
+                    `;
+                    console.log('✅ Report downloaded:', filename);
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to generate report');
+                }
+            } catch (error) {
+                console.error('Error generating report:', error);
+                statusDiv.style.background = '#f8d7da';
+                statusDiv.style.color = '#721c24';
+                statusDiv.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+
+        // =============================================================================
+        // END AUTOMATIC REPORT SCHEDULING FUNCTIONS
+        // =============================================================================
+
+        // Load active students on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('📄 Admin dashboard DOM loaded');
+            initializeSocket();
+        });
+
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', function() {
-            initializeSocket();
+            // Load initial schedule on page load
+            loadSchedule();
+            
+            // Auto-load schedule when lab changes
+            document.getElementById('scheduleLabId').addEventListener('change', loadSchedule);
         });
     </script>
 </body>

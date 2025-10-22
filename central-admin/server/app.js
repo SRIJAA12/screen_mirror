@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
+const cron = require('node-cron');
 
 // NEW: CSV Import Dependencies (using secure ExcelJS instead of xlsx)
 const multer = require('multer');
@@ -137,6 +138,26 @@ const otpSchema = new mongoose.Schema({
 });
 
 const OTP = mongoose.model('OTP', otpSchema);
+
+// Report Schedule Schema - Updated to support 2 schedules per day
+const reportScheduleSchema = new mongoose.Schema({
+  labId: { type: String, required: true, unique: true },
+  // Schedule 1 (Morning/Afternoon)
+  scheduleTime1: { type: String, default: '13:00' }, // 24-hour format HH:MM
+  enabled1: { type: Boolean, default: true },
+  // Schedule 2 (Evening)
+  scheduleTime2: { type: String, default: '18:00' }, // 24-hour format HH:MM
+  enabled2: { type: Boolean, default: true },
+  // Legacy support
+  scheduleTime: { type: String }, // Kept for backward compatibility
+  enabled: { type: Boolean }, // Kept for backward compatibility
+  lastGenerated: { type: Date },
+  outputPath: { type: String, default: './reports' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const ReportSchedule = mongoose.model('ReportSchedule', reportScheduleSchema);
 
 // Email Configuration - Now enabled for real email sending
 let emailTransporter = null;
@@ -2330,6 +2351,55 @@ app.post('/api/end-lab-session', async (req, res) => {
   }
 });
 
+// Update session duration - allows adjusting duration after session starts
+app.post('/api/update-session-duration', async (req, res) => {
+  try {
+    const { sessionId, periods, expectedDuration } = req.body;
+    
+    if (!sessionId || !periods || !expectedDuration) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Session ID, periods, and expected duration are required' 
+      });
+    }
+    
+    // Validate periods (1-6)
+    if (periods < 1 || periods > 6) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Periods must be between 1 and 6' 
+      });
+    }
+    
+    // Find and update the lab session
+    const labSession = await LabSession.findById(sessionId);
+    if (!labSession) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Lab session not found' 
+      });
+    }
+    
+    // Update the duration
+    labSession.periods = periods;
+    labSession.expectedDuration = expectedDuration;
+    labSession.updatedAt = new Date();
+    await labSession.save();
+    
+    console.log(`⏱️ Session duration updated: ${labSession.subject} - ${periods} periods (${expectedDuration} min)`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Session duration updated successfully',
+      session: labSession
+    });
+    
+  } catch (error) {
+    console.error('Error updating session duration:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Force clear everything - emergency endpoint
 app.post('/api/force-clear-all', async (req, res) => {
   try {
@@ -2710,8 +2780,295 @@ io.on('connection', (socket) => {
   });
 });
 
+// =============================================================================
+// AUTOMATIC REPORT SCHEDULING SYSTEM
+// =============================================================================
+
+let scheduledTasks = new Map();
+
+// Function to generate and save report (returns CSV content)
+async function generateScheduledReport(labId) {
+  try {
+    console.log(`📊 Generating scheduled report for lab: ${labId} at ${new Date().toLocaleString()}`);
+    
+    const startDate = new Date();
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+    
+    const filter = {
+      labId: labId,
+      loginTime: { $gte: startDate, $lte: endDate }
+    };
+    
+    const sessions = await Session.find(filter).sort({ loginTime: -1 }).lean();
+    
+    // Format CSV data
+    const csvData = sessions.map(session => ({
+      'Session ID': session._id.toString(),
+      'Student Name': session.studentName || 'N/A',
+      'Student ID': session.studentId || 'N/A',
+      'Computer Name': session.computerName || 'N/A',
+      'Lab ID': session.labId || 'N/A',
+      'System Number': session.systemNumber || 'N/A',
+      'Login Time': session.loginTime ? new Date(session.loginTime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'N/A',
+      'Logout Time': session.logoutTime ? new Date(session.logoutTime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'Still Active',
+      'Duration (seconds)': session.duration || 'N/A',
+      'Status': session.status || 'unknown'
+    }));
+    
+    // Create CSV content
+    const csvHeaders = Object.keys(csvData[0] || {}).join(',') + '\n';
+    const csvRows = csvData.map(row => 
+      Object.values(row).map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+    const csvContent = csvHeaders + csvRows;
+    
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `${labId}-sessions-${timestamp}.csv`;
+    
+    // Update last generated timestamp
+    await ReportSchedule.findOneAndUpdate(
+      { labId },
+      { lastGenerated: new Date() }
+    );
+    
+    console.log(`✅ Report generated: ${filename}`);
+    
+    return { success: true, csvContent, filename, count: sessions.length };
+  } catch (error) {
+    console.error('❌ Error generating scheduled report:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Setup cron jobs for all labs - Updated to support 2 schedules per day
+async function setupReportSchedulers() {
+  try {
+    const schedules = await ReportSchedule.find({});
+    let totalSchedules = 0;
+    
+    for (const schedule of schedules) {
+      // Schedule 1
+      if (schedule.scheduleTime1 && schedule.enabled1) {
+        const [hours1, minutes1] = schedule.scheduleTime1.split(':');
+        const cronExpression1 = `${minutes1} ${hours1} * * *`; // Daily at specified time
+        
+        console.log(`⏰ Scheduling report 1 for ${schedule.labId} at ${schedule.scheduleTime1} (${cronExpression1})`);
+        
+        const task1 = cron.schedule(cronExpression1, async () => {
+          const result = await generateScheduledReport(schedule.labId);
+          
+          if (result.success && io) {
+            console.log(`📢 Broadcasting scheduled report 1 for ${schedule.labId}`);
+            io.emit('scheduled-report-ready', {
+              labId: schedule.labId,
+              scheduleNumber: 1,
+              filename: result.filename,
+              csvContent: result.csvContent,
+              count: result.count,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }, {
+          timezone: 'Asia/Kolkata'
+        });
+        
+        scheduledTasks.set(`${schedule.labId}-schedule1`, task1);
+        totalSchedules++;
+      }
+      
+      // Schedule 2
+      if (schedule.scheduleTime2 && schedule.enabled2) {
+        const [hours2, minutes2] = schedule.scheduleTime2.split(':');
+        const cronExpression2 = `${minutes2} ${hours2} * * *`; // Daily at specified time
+        
+        console.log(`⏰ Scheduling report 2 for ${schedule.labId} at ${schedule.scheduleTime2} (${cronExpression2})`);
+        
+        const task2 = cron.schedule(cronExpression2, async () => {
+          const result = await generateScheduledReport(schedule.labId);
+          
+          if (result.success && io) {
+            console.log(`📢 Broadcasting scheduled report 2 for ${schedule.labId}`);
+            io.emit('scheduled-report-ready', {
+              labId: schedule.labId,
+              scheduleNumber: 2,
+              filename: result.filename,
+              csvContent: result.csvContent,
+              count: result.count,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }, {
+          timezone: 'Asia/Kolkata'
+        });
+        
+        scheduledTasks.set(`${schedule.labId}-schedule2`, task2);
+        totalSchedules++;
+      }
+      
+      // Legacy support - old single schedule
+      if (!schedule.scheduleTime1 && !schedule.scheduleTime2 && schedule.scheduleTime && schedule.enabled) {
+        const [hours, minutes] = schedule.scheduleTime.split(':');
+        const cronExpression = `${minutes} ${hours} * * *`;
+        
+        console.log(`⏰ Scheduling legacy report for ${schedule.labId} at ${schedule.scheduleTime}`);
+        
+        const task = cron.schedule(cronExpression, async () => {
+          const result = await generateScheduledReport(schedule.labId);
+          
+          if (result.success && io) {
+            io.emit('scheduled-report-ready', {
+              labId: schedule.labId,
+              filename: result.filename,
+              csvContent: result.csvContent,
+              count: result.count,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }, {
+          timezone: 'Asia/Kolkata'
+        });
+        
+        scheduledTasks.set(schedule.labId, task);
+        totalSchedules++;
+      }
+    }
+    
+    console.log(`✅ ${totalSchedules} report scheduler(s) initialized for ${schedules.length} lab(s)`);
+  } catch (error) {
+    console.error('❌ Error setting up schedulers:', error);
+  }
+}
+
+// Restart all schedulers (called when schedule is updated)
+async function restartReportScheduler() {
+  console.log('🔄 Restarting report schedulers...');
+  
+  // Stop all existing tasks
+  for (const [labId, task] of scheduledTasks.entries()) {
+    task.stop();
+    scheduledTasks.delete(labId);
+  }
+  
+  // Setup new tasks
+  await setupReportSchedulers();
+}
+
+// Get current report schedule
+app.get('/api/report-schedule/:labId', async (req, res) => {
+  try {
+    const { labId } = req.params;
+    let schedule = await ReportSchedule.findOne({ labId });
+    
+    if (!schedule) {
+      schedule = new ReportSchedule({ 
+        labId, 
+        scheduleTime1: '13:00',
+        enabled1: true,
+        scheduleTime2: '18:00',
+        enabled2: true
+      });
+      await schedule.save();
+    }
+    
+    res.json({ success: true, schedule });
+  } catch (error) {
+    console.error('Error fetching schedule:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update report schedule - Updated to support 2 schedules
+app.post('/api/report-schedule', async (req, res) => {
+  try {
+    const { labId, scheduleTime1, enabled1, scheduleTime2, enabled2 } = req.body;
+    
+    if (!labId) {
+      return res.status(400).json({ success: false, error: 'Lab ID is required' });
+    }
+    
+    if (!scheduleTime1 && !scheduleTime2) {
+      return res.status(400).json({ success: false, error: 'At least one schedule time is required' });
+    }
+    
+    // Validate time formats (HH:MM)
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    if (scheduleTime1 && !timeRegex.test(scheduleTime1)) {
+      return res.status(400).json({ success: false, error: 'Invalid time format for Schedule 1. Use HH:MM (24-hour)' });
+    }
+    if (scheduleTime2 && !timeRegex.test(scheduleTime2)) {
+      return res.status(400).json({ success: false, error: 'Invalid time format for Schedule 2. Use HH:MM (24-hour)' });
+    }
+    
+    let schedule = await ReportSchedule.findOne({ labId });
+    
+    if (schedule) {
+      if (scheduleTime1) schedule.scheduleTime1 = scheduleTime1;
+      if (enabled1 !== undefined) schedule.enabled1 = enabled1;
+      if (scheduleTime2) schedule.scheduleTime2 = scheduleTime2;
+      if (enabled2 !== undefined) schedule.enabled2 = enabled2;
+      schedule.updatedAt = new Date();
+    } else {
+      schedule = new ReportSchedule({ 
+        labId, 
+        scheduleTime1: scheduleTime1 || '13:00',
+        enabled1: enabled1 !== undefined ? enabled1 : true,
+        scheduleTime2: scheduleTime2 || '18:00',
+        enabled2: enabled2 !== undefined ? enabled2 : true
+      });
+    }
+    
+    await schedule.save();
+    
+    // Restart cron jobs with new schedules
+    await restartReportScheduler();
+    
+    console.log(`✅ Schedules updated for ${labId}:`);
+    if (scheduleTime1) console.log(`  - Schedule 1: ${scheduleTime1} (${enabled1 ? 'enabled' : 'disabled'})`);
+    if (scheduleTime2) console.log(`  - Schedule 2: ${scheduleTime2} (${enabled2 ? 'enabled' : 'disabled'})`);
+    
+    res.json({ success: true, schedule, message: 'Schedules updated successfully' });
+  } catch (error) {
+    console.error('Error updating schedule:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Manual trigger for testing - downloads CSV to browser
+app.post('/api/generate-report-now', async (req, res) => {
+  try {
+    const { labId } = req.body;
+    
+    if (!labId) {
+      return res.status(400).json({ success: false, error: 'Lab ID is required' });
+    }
+    
+    const result = await generateScheduledReport(labId);
+    
+    if (result.success) {
+      // Send CSV as download to browser
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+      
+      console.log(`📥 Sending report to browser: ${result.filename} (${result.count} sessions)`);
+      res.send(result.csvContent);
+    } else {
+      res.status(500).json({ success: false, error: result.error });
+    }
+  } catch (error) {
+    console.error('Error generating manual report:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// =============================================================================
+// END AUTOMATIC REPORT SCHEDULING SYSTEM
+// =============================================================================
+
 const PORT = process.env.PORT || 7401;
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', async () => {
   console.log(`\n${'='.repeat(60)}`);
   console.log(`🔐 College Lab Registration System`);
   console.log(`✅ Server running on port ${PORT}`);
@@ -2723,4 +3080,8 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`📊 API Endpoints: /api/import-students, /api/download-template, /api/stats`);
   console.log(`🛡️ Security: Using ExcelJS (no prototype pollution vulnerability)`);
   console.log(`${'='.repeat(60)}\n`);
+  
+  // Initialize automatic report schedulers
+  console.log('⏰ Initializing automatic report schedulers...');
+  await setupReportSchedulers();
 });
