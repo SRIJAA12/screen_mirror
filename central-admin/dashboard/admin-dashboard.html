@@ -593,7 +593,7 @@
         function initializeSocket() {
             console.log('🚀 Admin dashboard loading...');
             
-            socket = io('http://192.168.29.212:7401');
+            socket = io('http://10.10.46.182:7401');
             
             socket.on('connect', () => {
                 console.log('✅ Admin dashboard connected:', socket.id);
